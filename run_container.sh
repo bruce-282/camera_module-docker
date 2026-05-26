@@ -91,7 +91,15 @@ if [[ -n "$MOUNT_WS" ]]; then
     DOCKER_ARGS+=(-v "$(cd "$MOUNT_WS" && pwd):/workspace")
 fi
 
-[[ "$GPU" == "1" ]] && DOCKER_ARGS+=(--gpus all)
+if [[ "$GPU" == "1" ]]; then
+    DOCKER_ARGS+=(--gpus all)
+    # NVIDIA injects libnvidia-opencl.so; Zivid also needs ICD loader + vendor file from host.
+    if [[ -d /etc/OpenCL/vendors ]]; then
+        DOCKER_ARGS+=(-v /etc/OpenCL/vendors:/etc/OpenCL/vendors:ro)
+    else
+        echo "WARN: /etc/OpenCL/vendors missing on host; Zivid OpenCL may fail" >&2
+    fi
+fi
 
 if [[ $# -gt 0 ]]; then
     CONTAINER_CMD=("$@")

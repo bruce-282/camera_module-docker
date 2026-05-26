@@ -80,7 +80,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN set -eu; \
     apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates libusb-1.0-0 libudev1 libgl1 libglib2.0-0; \
+        ca-certificates libusb-1.0-0 libudev1 libgl1 libglib2.0-0 \
+        ocl-icd-libopencl1; \
     if [ "$CAMERA_EXTRA" = "zivid" ]; then \
         apt-get install -y --no-install-recommends wget && \
         wget -q -O /tmp/zivid.deb \

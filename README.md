@@ -2,72 +2,208 @@
 
 **Ubuntu 22.04 (네이티브)** 전제. WSL/Docker Desktop은 지원하지 않습니다.
 
-`pass`로 **한 번** `make build` → 이미지 안에 `camera_module` + venv.  
-호스트 clone 없음. IDE는 컨테이너 안 `/build/camera_module`만 열면 됩니다.
+`pass` + `make build` **한 번** → 이미지 안에 `camera_module` + venv.  
+호스트에 repo clone 없음. IDE는 컨테이너 `/build/camera_module`만 열면 됩니다.
 
-## 전제 (Ubuntu 호스트)
+---
+
+## 한 번에 세팅 (새 PC)
+
+Ubuntu 22.04에서 repo clone 후:
 
 ```bash
-# Docker (Ubuntu)
-sudo apt install docker.io docker-buildx-plugin
+cd camera_module-docker
+
+# GPG 키 파일이 있으면
+./setup-host.sh --gpg-key ~/Downloads/gpg-private.asc
+
+# 또는 대화형 (키 경로 / scp 안내)
+./setup-host.sh
+
+# 또는
+make setup
+```
+
+하는 일: `apt` (docker, docker-buildx, nvidia-container-toolkit, pass, clinfo) → 옛 `~/.docker/cli-plugins/docker-buildx` 정리 → Docker 그룹 → NVIDIA runtime → pass store clone → `make build`.
+
+옵션: `--skip-build` · `--skip-nvidia` · `--check` · `--help`
+
+GPG 키는 GitLab에 올리지 말고 USB/예전 PC에서 `--gpg-key`로 import.
+
+---
+
+## 빠른 시작 (이 PC에서 이미 GPG 키 import 완료 시)
+
+```bash
+cd camera_module-docker
+./setup-pass.sh --check
+make build
+```
+
+---
+
+## pass가 하는 일 (한 번 이해하면 PC 바꿀 때 덜 헷갈림)
+
+| 무엇 | 어디 | 설명 |
+|------|------|------|
+| GitLab 토큰 (암호화됨) | `password-store.git` | `*.gpg` 파일. 팀이 공유 |
+| GPG **개인키** | 각 PC `~/.gnupg` | 복호화용. **GitLab에 올리지 않음** |
+| GPG 패스프레이즈 | 본인만 | 개인키 파일 유출 시 추가 방어 |
+| `make build` | 이 repo | pass에서 토큰 읽어 Docker secret으로 clone/install |
+
+- **웹/GitLab에 매번 토큰 등록할 필요 없음** — store에 이미 있음.
+- **새 개발 PC마다** GPG 개인키 import + store clone **한 번**만 하면 됨.
+- 일상 작업(`make build`, `pass show`)은 **같은 PC에서 반복 설정 불필요**.
+
+팀 store:
+
+- 저장소: `https://gitlab.cmes-ai.com/bruce/password-store.git`
+- 빌드에 필요한 항목: `gitlab/cmesrobotics/camera_module`, `gitlab/cmesrobotics/crp_core`
+- `.gpg-id`: 이 store를 암호화한 GPG ID (예: `juntae.kim`) — **이 ID와 맞는 개인키**가 PC에 있어야 함
+
+---
+
+## 새 PC / 새 Ubuntu 세팅 (전체 순서)
+
+### 0. 전제 패키지
+
+자동: `./setup-host.sh` · 수동:
+
+```bash
+# Docker
+sudo apt install docker.io docker-buildx
 sudo usermod -aG docker $USER   # 재로그인
 
-# pass + git (또는 setup-pass.sh)
+# pass (또는 make setup-pass)
 sudo apt install pass gnupg git
 ```
 
 - 권장: **Ubuntu 22.04 amd64** (Zivid SDK `.deb`가 `u22` 기준)
-- USB 카메라: 호스트 udev rule 적용 후 컨테이너에 `/dev/bus/usb` 패스스루 (`run_container.sh` 기본)
+- USB 카메라: 호스트 udev rule 후 컨테이너 `/dev/bus/usb` 패스스루 (`run_container.sh` 기본)
 
-## 1. pass (팀 password-store)
+### 1. GPG 개인키 import (PC마다 1회)
 
-토큰은 **GitLab 저장소**에서 가져옵니다 (로컬에 PAT를 새로 만들 필요 없음):
-
-- 저장소: `https://gitlab.cmes-ai.com/bruce/password-store.git`
-- 항목: `gitlab/cmesrobotics/camera_module`, `gitlab/cmesrobotics/crp_core`
-
-**먼저** CMES용 GPG **개인키**가 이 PC에 있어야 합니다. 저장소 `.gpg-id`에 적힌 ID(예: `juntae.kim`)와 **일치하는** 키여야 복호화됩니다. `setup-pass`로 새로 만든 키(`FEF82060…`)로는 열리지 않습니다.
+예전 PC·USB 등에서 `gpg-private.asc` (또는 팀 백업)를 받아:
 
 ```bash
-gpg --import /path/to/your-private-key.asc   # 없으면 admin/백업에서 받기
-./setup-pass.sh                              # clone/pull → 항목 확인
-# 또는
-make setup-pass
+gpg --import ~/Downloads/gpg-private.asc
+gpg --list-secret-keys --keyid-format LONG
+# .gpg-id와 맞는 키(예: juntae.kim@cmesrobotics.ai)가 sec 로 보여야 함
 ```
 
-수동:
+**다른 PC에서 scp로 보내기** (IP는 `hostname -I`로 확인):
 
 ```bash
-pass git clone https://gitlab.cmes-ai.com/bruce/password-store.git ~/.password-store
-pass git pull
+# 예전 PC에서
+scp ~/gpg-private.asc bruce@<새PC-IP>:~/Downloads/gpg-private.asc
+```
+
+import 후 Downloads 복사본 삭제:
+
+```bash
+rm ~/Downloads/gpg-private.asc
+```
+
+> **주의:** `setup-pass.sh`가 제안하는 **새 GPG 키 생성은 팀 store용이 아님.**  
+> 실수로 `pass init`만 한 로컬 store는 팀 repo와 맞지 않음.
+
+### 2. password-store clone + 확인
+
+```bash
+cd camera_module-docker
+make setup-pass
+# 또는: ./setup-pass.sh
+```
+
+스크립트가 하는 일: `pass`/`git` 설치 → GitLab에서 store clone (기존 잘못된 `~/.password-store` 있으면 교체 확인) → 항목 검증.
+
+수동으로 할 경우:
+
+```bash
+rm -rf ~/.password-store   # 잘못된 pass init 잔여물 있을 때만
+git clone https://gitlab.cmes-ai.com/bruce/password-store.git ~/.password-store
 pass show gitlab/cmesrobotics/camera_module
 pass show gitlab/cmesrobotics/crp_core
 ```
 
-검증만: `./setup-pass.sh --check` · 동기화: `./setup-pass.sh --pull`
-
-### 잘못 `pass init` / 새 GPG 키를 만든 경우
-
-방금 스크립트로 빈 `~/.password-store` + 새 키만 생겼다면, 팀 저장소와 맞지 않습니다. **Ctrl+C**로 중단한 뒤:
-
-```bash
-rm -rf ~/.password-store
-gpg --import ...    # 팀 GPG 개인키 (새로 만든 FEF82060… 키가 아님)
-make setup-pass     # git clone (pass init 잔여물 있으면 자동 삭제 후 clone)
-```
-
-로컬 전용(팀 store 아님): `./setup-pass.sh --local`
-
-## 2. 빌드 (토큰은 여기서만)
+### 3. 빌드
 
 ```bash
 make build
 ```
 
-## 3. Cursor / VS Code (Ubuntu)
+토큰은 **여기서만** Docker BuildKit secret으로 들어감 (이미지 history에 남지 않도록 설계).
+
+---
+
+## setup-pass.sh
+
+| 명령 | 용도 |
+|------|------|
+| `./setup-pass.sh` / `make setup-pass` | 설치 + clone/pull + 항목 확인 |
+| `./setup-pass.sh --check` | `make check-pass`와 동일 검증 |
+| `./setup-pass.sh --pull` | store만 git pull |
+| `./setup-pass.sh --install` | apt로 pass/gnupg/git만 |
+| `./setup-pass.sh --local` | **팀 store 아님** — 로컬 전용 빈 store |
+
+환경 변수 (Makefile과 동일):
+
+- `PASS_STORE_REPO` — 기본 `https://gitlab.cmes-ai.com/bruce/password-store.git`
+- `PASS_CAMERA` — 기본 `gitlab/cmesrobotics/camera_module`
+- `PASS_CRP_CORE` — 기본 `gitlab/cmesrobotics/crp_core`
+
+---
+
+## GPG 개인키 백업 (어디에 둘지)
+
+**올리면 안 되는 곳:** GitLab/GitHub, Slack, 메일, 클라우드 Drive 등 — store의 `*.gpg`와 **같은 곳에 두면 pass 의미 없음**.
+
+**권장 백업 (1~2벌):**
+
+1. **예전/주 PC** — `~/gpg-private.asc` 또는 `~/.gnupg` (새 PC 세팅 시 scp/USB로 import)
+2. **집 USB 1개** — 가방에 매일 휴대 X. 가능하면 `zip -e`로 추가 암호
 
 ```bash
-cd ~/sources/camera_module-docker
+# USB 백업 예 (선택)
+zip -e gpg-backup.zip ~/gpg-private.asc
+```
+
+**일상:** 키는 `~/.gnupg`에만 두고 들고 다니지 않음.  
+**새 PC:** 백업에서 import → `make setup-pass` → `make build` (5분 루틴).
+
+---
+
+## 문제 해결
+
+### `pass show` / `--check` 실패 (No secret key)
+
+- 팀 `.gpg-id`와 **다른** GPG 키만 PC에 있음 → 올바른 `gpg-private.asc` import
+- 실수로 만든 로컬 키 삭제 (예):
+
+```bash
+gpg --delete-secret-key <잘못된_KEY_ID>
+gpg --delete-key <잘못된_KEY_ID>
+```
+
+### clone 후 GitLab 토큰 입력 프롬프트
+
+- 항목은 store에 **이미 있음**. 프롬프트는 **복호화 실패**를 잘못 안내한 것 → **Ctrl+C**, GPG 키부터 맞추기
+- `./setup-pass.sh --check`로 확인
+
+### `pass git clone` / `not a git repository`
+
+- `pass init` 잔여 `~/.password-store` 때문 → `make setup-pass` (자동 삭제 후 `git clone`)
+
+### GPG 패스프레이즈
+
+- `pass show` 시 물어볼 수 있음 — 키 생성/export 때 설정한 비밀번호. 파일과 별개로 기억해 둘 것.
+
+---
+
+## Cursor / VS Code
+
+```bash
+cd camera_module-docker
 make build
 cursor .    # 또는 code .
 # → Dev Containers: Reopen in Container
@@ -76,7 +212,9 @@ cursor .    # 또는 code .
 - workspace: `/build/camera_module` (이미지 안 코드 + `.venv`)
 - devcontainer는 Dockerfile을 직접 빌드하지 않음 (`pass` secret 때문)
 
-## 4. 실행
+---
+
+## 실행
 
 ```bash
 make shell          # bash @ /build/camera_module
@@ -84,24 +222,46 @@ make run-gui        # X11 (Ubuntu 데스크톱)
 ./run_container.sh --gpu   # Zivid 등 GPU/OpenCL 필요 시
 ```
 
+---
+
 ## Zivid (Ubuntu)
 
-Zivid는 **호스트 OpenCL**이 필요합니다. 컨테이너만으로는 `CL_PLATFORM_NOT_FOUND_KHR`가 납니다.
+Zivid는 **OpenCL** 필요 (`CL_PLATFORM_NOT_FOUND_KHR` = OpenCL 미설정).
 
-호스트에서:
+**호스트:**
 
 ```bash
 sudo apt install clinfo
-clinfo -l                    # platform 1개 이상
-# NVIDIA: 드라이버 설치 후
-sudo gpasswd -a $USER render
-sudo gpasswd -a $USER video
+clinfo -l                    # NVIDIA platform 1개 이상
+sudo gpasswd -a $USER render video   # 실제 USB 카메라 시, 재로그인
 ```
 
-컨테이너 실행 시 GPU 넘기기: `./run_container.sh --gpu`  
-virtual camera 경로는 Linux 경로로 설정 (`/path/to/zfc`, `data/zivid.config.yml` 등).
+**컨테이너** (호스트 GPU/OpenCL + ICD 전달):
+
+```bash
+sudo apt install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+
+make build                   # 이미지에 ocl-icd-libopencl1 포함
+./run_container.sh --gpu     # --gpus all + /etc/OpenCL/vendors 마운트
+```
+
+컨테이너 안 확인:
+
+```bash
+python3 -c "import ctypes; o=ctypes.CDLL('libOpenCL.so.1'); n=ctypes.c_uint32(); o.clGetPlatformIDs(0,None,ctypes.byref(n)); print('platforms', n.value)"
+# platforms 1 이면 OK
+```
+
+컨테이너 안 `sudo`/`apt` 불필요 — OpenCL은 호스트 드라이버 + `--gpu`로 들어옴.
+
+virtual camera 경로는 Linux 경로 (`/path/to/zfc`, `data/zivid.config.yml` 등).
+
+---
 
 ## 참고
 
 - 코드 변경은 컨테이너 안. 의존성 바뀌면 `make build` 재실행.
 - Orbbec only: `make build-orbbec`
+- store 동기화: `./setup-pass.sh --pull`
