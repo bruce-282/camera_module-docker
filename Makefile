@@ -7,7 +7,10 @@ CAMERA_EXTRA      ?= zivid
 PASS_CAMERA       ?= gitlab/cmesrobotics/camera_module
 PASS_CRP_CORE     ?= gitlab/cmesrobotics/crp_core
 
-.PHONY: build build-orbbec verify run run-gui shell clean check-pass
+.PHONY: build build-orbbec verify run run-gui shell clean check-pass setup-pass
+
+setup-pass:
+	@./setup-pass.sh
 
 check-pass:
 	@for entry in $(PASS_CAMERA) $(PASS_CRP_CORE); do \
