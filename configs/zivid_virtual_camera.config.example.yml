@@ -1,0 +1,13 @@
+# Copy to ~/.cmes/ZividCapture/configs/zivid_camera.config.yml
+
+common:
+  device_id: FileCameraZivid2PlusMR130.zfc
+  device_ip: ''
+  enabled_camera_types:
+    - zivid
+  use_virtual_camera: true
+
+zivid:
+  # Linux path under ~/camera_module (NOT C:\ProgramData\...)
+  virtual_camera_path: /home/bruce/camera_module/src/crp_camera/cam/zivid/data
+  cam_param_path: /home/bruce/camera_module/configs/zivid.config.yml

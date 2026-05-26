@@ -1,21 +1,16 @@
 #!/usr/bin/env bash
 #
-# setup-host.sh — apt, Docker, pass, make install (~/camera_module)
+# docker/setup.sh — apt, Docker, pass, make install (~/camera_module)
 #
 # Usage:
-#   ./setup-host.sh                          full setup (interactive)
-#   ./setup-host.sh --gpg-key ~/gpg-private.asc
-#   ./setup-host.sh --skip-build             host + pass only
-#   ./setup-host.sh --skip-nvidia            no nvidia-container-toolkit
-#   ./setup-host.sh --check                  verify host + pass + docker
-#
-# Prereqs:
-#   Ubuntu 22.04 amd64, sudo, team GPG private key (gpg-private.asc on USB/old PC)
+#   ./docker/setup.sh
+#   ./docker/setup.sh --gpg-key ~/gpg-private.asc
+#   make setup-host
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 SKIP_BUILD=0
 SKIP_NVIDIA=0
@@ -34,7 +29,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --gpg-key=*)    GPG_KEY="${1#*=}"; shift ;;
         -h|--help)
-            sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *)
@@ -98,7 +93,7 @@ ensure_docker_group() {
     sudo usermod -aG docker "$USER"
     if ! docker info >/dev/null 2>&1; then
         echo "WARN: docker still needs new group — run: newgrp docker" >&2
-        echo "      then re-run: ./setup-host.sh --check" >&2
+        echo "      then re-run: make setup-host --check" >&2
     fi
 }
 
@@ -161,7 +156,8 @@ import_gpg_key() {
 
 prompt_gpg_import() {
     local store_dir="${PASSWORD_STORE:-$HOME/.password-store}"
-    if [[ -f "${store_dir}/.gpg-id" ]] && "$SCRIPT_DIR/setup-pass.sh" --check >/dev/null 2>&1; then
+    if [[ -f "${store_dir}/.gpg-id" ]] \
+        && "$REPO_ROOT/common/setup-pass.sh" --check >/dev/null 2>&1; then
         return 0
     fi
     if [[ -n "$GPG_KEY" ]]; then
@@ -169,19 +165,15 @@ prompt_gpg_import() {
         return 0
     fi
     mapfile -t secs < <(gpg --list-secret-keys --keyid-format LONG 2>/dev/null | awk -F/ '/^sec/ {print $2}' | awk '{print $1}')
-    if [[ ${#secs[@]} -gt 0 ]] && "$SCRIPT_DIR/setup-pass.sh" --check >/dev/null 2>&1; then
+    if [[ ${#secs[@]} -gt 0 ]] \
+        && "$REPO_ROOT/common/setup-pass.sh" --check >/dev/null 2>&1; then
         return 0
     fi
     echo
     echo "Team password-store needs your GPG private key (gpg-private.asc from old PC / USB)."
-    echo "  scp user@old-pc:~/gpg-private.asc ~/Downloads/gpg-private.asc"
     read -rp "Path to gpg-private.asc (Enter to skip): " GPG_KEY
     [[ -z "${GPG_KEY// }" ]] && return 0
     import_gpg_key "$GPG_KEY"
-}
-
-run_setup_pass() {
-    "$SCRIPT_DIR/setup-pass.sh"
 }
 
 run_build() {
@@ -193,17 +185,17 @@ run_build() {
         echo "WARN: docker not usable — run: newgrp docker && make install" >&2
         return 0
     fi
-    make install
+    make -C "$REPO_ROOT" install
 }
 
 check_all() {
     local ok=1
     command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && echo ">> OK: docker" || { echo "ERROR: docker" >&2; ok=0; }
     docker buildx ls 2>/dev/null | grep -q running && echo ">> OK: buildx" || { echo "ERROR: buildx" >&2; ok=0; }
-    "$SCRIPT_DIR/setup-pass.sh" --check || ok=0
+    "$REPO_ROOT/common/setup-pass.sh" --check || ok=0
     check_host_opencl
     local mod="${CAMERA_MODULE_DIR:-$HOME/camera_module}"
-    if [[ -d "${mod}/.venv" ]]; then
+    if [[ -f "${mod}/.venv/pyvenv.cfg" ]]; then
         echo ">> OK: ${mod}/.venv"
     else
         echo "WARN: run: make install" >&2
@@ -223,12 +215,12 @@ main() {
             ensure_docker_group
             setup_nvidia_container
             prompt_gpg_import
-            run_setup_pass
+            "$REPO_ROOT/common/setup-pass.sh"
             check_host_opencl
             run_build
             echo ">> Done."
             echo ">> Code:  ~/camera_module"
-            echo ">> Run:   cd $SCRIPT_DIR && make shell   # Zivid: needs --gpu (make shell includes it)"
+            echo ">> Run:   make shell"
             ;;
     esac
 }

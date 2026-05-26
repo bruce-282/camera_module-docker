@@ -1,28 +1,21 @@
 #!/usr/bin/env bash
 #
-# install-camera-module.sh — clone + venv at ~/camera_module (pass tokens, Docker for Zivid deps)
+# docker/install.sh — clone + venv at ~/camera_module (pass + Docker for Zivid deps)
 #
 # Usage:
-#   ./install-camera-module.sh
-#   ./install-camera-module.sh --pull          git pull only
-#   CAMERA_MODULE_DIR=~/src/camera_module ./install-camera-module.sh
+#   ./docker/install.sh
+#   ./docker/install.sh --pull
+#   make install
 #
-# Host-only (no Docker): ./install-camera-module-host.sh  or  make install-host
-#
-# Env:
-#   CAMERA_MODULE_DIR   default: $HOME/camera_module
-#   CAMERA_REPO         default: gitlab.cmes-ai.com/crp/module/camera_module.git
-#   CAMERA_BRANCH       default: dev/0.x
-#   CAMERA_EXTRA        default: zivid
-#   IMAGE               default: cmes/camera-module:dev
+# Host-only: ../host/install.sh  or  make install-host
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# shellcheck source=install-common.sh
-source "$SCRIPT_DIR/install-common.sh"
+# shellcheck source=../common/install-common.sh
+source "$REPO_ROOT/common/install-common.sh"
 
 CAMERA_MODULE_DIR="${CAMERA_MODULE_DIR:-$HOME/camera_module}"
 CAMERA_REPO="${CAMERA_REPO:-gitlab.cmes-ai.com/crp/module/camera_module.git}"
@@ -103,7 +96,8 @@ install_venv() {
 }
 
 main() {
-    "$SCRIPT_DIR/setup-pass.sh" --check >/dev/null 2>&1 || "$SCRIPT_DIR/setup-pass.sh"
+    "$REPO_ROOT/common/setup-pass.sh" --check >/dev/null 2>&1 \
+        || "$REPO_ROOT/common/setup-pass.sh"
     case "$MODE" in
         pull)
             clone_or_pull
@@ -113,7 +107,7 @@ main() {
             install_venv
             echo
             echo ">> Installed: $CAMERA_MODULE_DIR"
-            echo ">> Run: cd $SCRIPT_DIR && ./run_container.sh --gpu"
+            echo ">> Run: make shell   or   ./docker/run_container.sh --gpu"
             ;;
     esac
 }

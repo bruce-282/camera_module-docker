@@ -2,7 +2,6 @@
 # Zivid File Camera on host (no Docker)
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CAMERA_MODULE_DIR="${CAMERA_MODULE_DIR:-$HOME/camera_module}"
 VENV="${CAMERA_MODULE_DIR}/.venv"
 

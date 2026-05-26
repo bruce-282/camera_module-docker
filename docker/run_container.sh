@@ -1,17 +1,10 @@
 #!/usr/bin/env bash
 #
-# run_container.sh — launch camera_module container
-#
-# Code + venv: ~/camera_module on host (make install), same path inside container.
-# Zivid: use --gpu (see README).
+# docker/run_container.sh — launch camera_module container
 #
 # Usage:
-#   ./run_container.sh                    # bash @ ~/camera_module
-#   ./run_container.sh --gpu bash
-#   ./run_container.sh python3 scripts/python_run/capture_zivid_camera.py ...
-#
-# Env:
-#   CAMERA_MODULE_DIR   default: $HOME/camera_module
+#   ./docker/run_container.sh --gpu
+#   make shell
 
 set -euo pipefail
 
@@ -34,7 +27,7 @@ while [[ $# -gt 0 ]]; do
         --image)       IMAGE="$2"; shift 2 ;;
         --name)        NAME="$2"; shift 2 ;;
         -h|--help)
-            sed -n '3,16p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '3,8p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         --) shift; break ;;

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Zivid File Camera — Linux paths under ~/camera_module
+# Zivid File Camera via Docker + GPU
 set -euo pipefail
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CAMERA_MODULE_DIR="${CAMERA_MODULE_DIR:-$HOME/camera_module}"
 
 exec "${SCRIPT_DIR}/run_container.sh" --gpu bash -c '
 cd scripts/python_run
@@ -29,4 +29,4 @@ with CameraCaptureManager("zivid_camera", "ZividCapture", use_virtual_camera=Tru
         raise SystemExit(1)
     print("OK — Zivid virtual camera initialized")
 PY
-' 
+'

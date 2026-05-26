@@ -1,4 +1,4 @@
-# host-deps.sh — apt + Zivid SDK on Ubuntu 22.04 host (no Docker)
+# host/deps.sh — apt + Zivid SDK on Ubuntu 22.04 (no Docker)
 
 ZIVID_SDK_RELEASE="${ZIVID_SDK_RELEASE:-2.15.0+5fcc365b-1}"
 

@@ -1,24 +1,21 @@
 #!/usr/bin/env bash
 #
-# install-camera-module-host.sh — clone + venv on host (pass tokens, no Docker)
+# host/install.sh — clone + venv on host (pass tokens, no Docker)
 #
 # Usage:
-#   ./install-camera-module-host.sh
-#   ./install-camera-module-host.sh --pull
-#   ./install-camera-module-host.sh --skip-deps   venv only (deps already installed)
-#   ./install-camera-module-host.sh --deps-only   apt + Zivid SDK only
-#
-# Env: same as install-camera-module.sh (CAMERA_MODULE_DIR, CAMERA_EXTRA, …)
+#   ./host/install.sh
+#   ./host/install.sh --pull
+#   make install-host
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# shellcheck source=install-common.sh
-source "$SCRIPT_DIR/install-common.sh"
-# shellcheck source=host-deps.sh
-source "$SCRIPT_DIR/host-deps.sh"
+# shellcheck source=../common/install-common.sh
+source "$REPO_ROOT/common/install-common.sh"
+# shellcheck source=deps.sh
+source "$SCRIPT_DIR/deps.sh"
 
 CAMERA_MODULE_DIR="${CAMERA_MODULE_DIR:-$HOME/camera_module}"
 CAMERA_REPO="${CAMERA_REPO:-gitlab.cmes-ai.com/crp/module/camera_module.git}"
@@ -36,7 +33,7 @@ for arg in "$@"; do
         --skip-deps) SKIP_DEPS=1 ;;
         --deps-only) DEPS_ONLY=1 ;;
         -h|--help)
-            sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *)
@@ -57,7 +54,8 @@ install_venv_host() {
 }
 
 main() {
-    "$SCRIPT_DIR/setup-pass.sh" --check >/dev/null 2>&1 || "$SCRIPT_DIR/setup-pass.sh"
+    "$REPO_ROOT/common/setup-pass.sh" --check >/dev/null 2>&1 \
+        || "$REPO_ROOT/common/setup-pass.sh"
 
     if (( DEPS_ONLY == 1 )); then
         install_host_deps
@@ -81,7 +79,7 @@ main() {
             echo
             echo ">> Installed: $CAMERA_MODULE_DIR"
             echo ">> Activate:  source $CAMERA_MODULE_DIR/.venv/bin/activate"
-            echo ">> Zivid test: cd $SCRIPT_DIR && ./run_zivid_capture-host.sh"
+            echo ">> Zivid test: ./host/run_zivid_capture.sh"
             ;;
     esac
 }

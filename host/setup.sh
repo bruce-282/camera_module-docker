@@ -1,22 +1,19 @@
 #!/usr/bin/env bash
 #
-# setup-host-native.sh — pass + apt + Zivid on host (no Docker)
+# host/setup.sh — pass + apt + Zivid on host (no Docker)
 #
 # Usage:
-#   ./setup-host-native.sh
-#   ./setup-host-native.sh --gpg-key ~/gpg-private.asc
-#   ./setup-host-native.sh --skip-install   deps + pass only
-#   ./setup-host-native.sh --check
-#
-# Prereqs: Ubuntu 22.04 amd64, sudo, team GPG key
+#   ./host/setup.sh
+#   ./host/setup.sh --gpg-key ~/gpg-private.asc
+#   make setup-host-native
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# shellcheck source=host-deps.sh
-source "$SCRIPT_DIR/host-deps.sh"
+# shellcheck source=deps.sh
+source "$SCRIPT_DIR/deps.sh"
 
 SKIP_INSTALL=0
 GPG_KEY=""
@@ -33,7 +30,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --gpg-key=*)    GPG_KEY="${1#*=}"; shift ;;
         -h|--help)
-            sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *)
@@ -61,7 +58,7 @@ import_gpg_key() {
 }
 
 prompt_gpg_import() {
-    if "$SCRIPT_DIR/setup-pass.sh" --check >/dev/null 2>&1; then
+    if "$REPO_ROOT/common/setup-pass.sh" --check >/dev/null 2>&1; then
         return 0
     fi
     if [[ -n "$GPG_KEY" ]]; then
@@ -86,7 +83,7 @@ check_host_opencl() {
 
 check_all() {
     local ok=1 mod="${CAMERA_MODULE_DIR:-$HOME/camera_module}"
-    "$SCRIPT_DIR/setup-pass.sh" --check || ok=0
+    "$REPO_ROOT/common/setup-pass.sh" --check || ok=0
     command -v uv >/dev/null 2>&1 && echo ">> OK: uv" || { echo "ERROR: uv" >&2; ok=0; }
     if [[ "${CAMERA_EXTRA:-zivid}" == "zivid" ]]; then
         dpkg-query -W -f='${Status}' zivid 2>/dev/null | grep -q "install ok installed" \
@@ -109,16 +106,16 @@ main() {
         setup)
             install_host_deps
             prompt_gpg_import
-            "$SCRIPT_DIR/setup-pass.sh"
+            "$REPO_ROOT/common/setup-pass.sh"
             check_host_opencl
             if (( SKIP_INSTALL == 0 )); then
                 CAMERA_EXTRA="${CAMERA_EXTRA:-zivid}" \
-                    "$SCRIPT_DIR/install-camera-module-host.sh" --skip-deps
+                    "$SCRIPT_DIR/install.sh" --skip-deps
             fi
             echo ">> Done."
             echo ">> Code:  ~/camera_module"
             echo ">> Run:   source ~/camera_module/.venv/bin/activate"
-            echo ">> Zivid: cd $SCRIPT_DIR && ./run_zivid_capture-host.sh"
+            echo ">> Zivid: ./host/run_zivid_capture.sh"
             ;;
     esac
 }
