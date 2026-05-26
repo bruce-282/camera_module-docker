@@ -7,6 +7,8 @@
 #   ./install-camera-module.sh --pull          git pull only
 #   CAMERA_MODULE_DIR=~/src/camera_module ./install-camera-module.sh
 #
+# Host-only (no Docker): ./install-camera-module-host.sh  or  make install-host
+#
 # Env:
 #   CAMERA_MODULE_DIR   default: $HOME/camera_module
 #   CAMERA_REPO         default: gitlab.cmes-ai.com/crp/module/camera_module.git
@@ -19,6 +21,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# shellcheck source=install-common.sh
+source "$SCRIPT_DIR/install-common.sh"
+
 CAMERA_MODULE_DIR="${CAMERA_MODULE_DIR:-$HOME/camera_module}"
 CAMERA_REPO="${CAMERA_REPO:-gitlab.cmes-ai.com/crp/module/camera_module.git}"
 CAMERA_BRANCH="${CAMERA_BRANCH:-dev/0.x}"
@@ -30,18 +35,6 @@ PASS_CRP_CORE="${PASS_CRP_CORE:-gitlab/cmesrobotics/crp_core}"
 MODE=install
 [[ "${1:-}" == "--pull" ]] && MODE=pull
 
-pass_token_user() {
-    local entry=$1
-    local token user
-    token="$(pass show "$entry" | sed -n '1p')"
-    user="$(pass show "$entry" | sed -nE 's/^login:[[:space:]]*//p')"
-    [[ -n "$token" && -n "$user" ]] || {
-        echo "ERROR: pass '$entry' needs token + login: line" >&2
-        exit 1
-    }
-    printf '%s\t%s' "$user" "$token"
-}
-
 ensure_image() {
     if docker image inspect "$IMAGE" >/dev/null 2>&1; then
         return 0
@@ -50,39 +43,52 @@ ensure_image() {
     exit 1
 }
 
-clone_or_pull() {
-    mkdir -p "$(dirname "$CAMERA_MODULE_DIR")"
-    if [[ -d "$CAMERA_MODULE_DIR/.git" ]]; then
-        echo ">> git pull $CAMERA_MODULE_DIR"
-        git -C "$CAMERA_MODULE_DIR" pull --ff-only
+cleanup_root_owned() {
+    if ! find "$CAMERA_MODULE_DIR" -user root -print -quit 2>/dev/null | grep -q .; then
         return 0
     fi
-    if [[ -d "$CAMERA_MODULE_DIR" ]]; then
-        echo "ERROR: $CAMERA_MODULE_DIR exists but is not a git repo" >&2
-        exit 1
-    fi
-    IFS=$'\t' read -r git_user git_token < <(pass_token_user "$PASS_CAMERA")
-    echo ">> git clone → $CAMERA_MODULE_DIR"
-    git clone --branch "$CAMERA_BRANCH" \
-        "https://${git_user}:${git_token}@${CAMERA_REPO}" "$CAMERA_MODULE_DIR"
-    git -C "$CAMERA_MODULE_DIR" remote set-url origin "https://${CAMERA_REPO}"
-    unset git_user git_token
+    echo ">> fixing root-owned files in $CAMERA_MODULE_DIR (previous install without --user)"
+    docker run --rm \
+        -v "$CAMERA_MODULE_DIR:$CAMERA_MODULE_DIR" \
+        "$IMAGE" \
+        chown -R "$(id -u):$(id -g)" "$CAMERA_MODULE_DIR"
 }
 
 install_venv() {
     ensure_image
+    cleanup_root_owned
+    if [[ -d "$CAMERA_MODULE_DIR/.venv" ]]; then
+        if [[ ! -w "$CAMERA_MODULE_DIR/.venv" ]] \
+            || [[ ! -x "$CAMERA_MODULE_DIR/.venv/bin/python" ]]; then
+            echo ">> removing broken .venv (wrong owner or incomplete)"
+            docker run --rm \
+                -v "$CAMERA_MODULE_DIR:$CAMERA_MODULE_DIR" \
+                "$IMAGE" \
+                rm -rf "$CAMERA_MODULE_DIR/.venv"
+        fi
+    fi
     IFS=$'\t' read -r crp_user crp_token < <(pass_token_user "$PASS_CRP_CORE")
     echo ">> uv venv + pip install -e .[${CAMERA_EXTRA}] in $CAMERA_MODULE_DIR"
     docker run --rm \
+        --user "$(id -u):$(id -g)" \
         -v "$CAMERA_MODULE_DIR:$CAMERA_MODULE_DIR" \
         -w "$CAMERA_MODULE_DIR" \
+        -e "HOME=${CAMERA_MODULE_DIR}/.docker-home" \
+        -e "UV_CACHE_DIR=${CAMERA_MODULE_DIR}/.cache/uv" \
+        -e "UV_LINK_MODE=copy" \
         -e "CRP_CORE_USER=${crp_user}" \
         -e "CRP_CORE_TOKEN=${crp_token}" \
         "$IMAGE" \
         bash -c '
             set -eu
+            mkdir -p "$HOME"
             git config --global --add safe.directory '"$CAMERA_MODULE_DIR"' 2>/dev/null || true
-            uv venv --python 3.10 .venv
+            if [[ -d .venv ]]; then
+                echo ">> replacing existing .venv"
+                uv venv --python 3.10 --clear .venv
+            else
+                uv venv --python 3.10 .venv
+            fi
             export VIRTUAL_ENV='"$CAMERA_MODULE_DIR"'/.venv
             export PATH="$VIRTUAL_ENV/bin:$PATH"
             git config --global credential.https://gitlab.cmes-ai.com.helper \

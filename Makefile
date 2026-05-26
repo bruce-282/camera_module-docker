@@ -10,7 +10,11 @@ PASS_CRP_CORE     ?= gitlab/cmesrobotics/crp_core
 
 export CAMERA_MODULE_DIR
 
-.PHONY: build build-orbbec install install-pull verify run run-gui shell clean check-pass setup-pass setup-host setup
+.PHONY: build build-orbbec install install-pull install-host install-host-pull \
+        verify run run-gui shell clean check-pass setup-pass setup-host setup-host-native setup
+
+setup-host-native:
+	@./setup-host-native.sh
 
 setup-host:
 	@./setup-host.sh
@@ -39,6 +43,12 @@ install: build
 
 install-pull:
 	@CAMERA_EXTRA=$(CAMERA_EXTRA) IMAGE=$(IMAGE) ./install-camera-module.sh --pull
+
+install-host: check-pass
+	@CAMERA_EXTRA=$(CAMERA_EXTRA) ./install-camera-module-host.sh
+
+install-host-pull: check-pass
+	@CAMERA_EXTRA=$(CAMERA_EXTRA) ./install-camera-module-host.sh --pull
 
 build-orbbec:
 	$(MAKE) build CAMERA_EXTRA=orbbec-linux
