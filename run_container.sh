@@ -56,24 +56,35 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     exit 1
 fi
 
-if [[ ! -d "$CAMERA_MODULE_DIR/.venv" ]]; then
-    echo "ERROR: $CAMERA_MODULE_DIR/.venv not found — run: make install" >&2
+if [[ ! -f "$CAMERA_MODULE_DIR/.venv/pyvenv.cfg" ]]; then
+    echo "ERROR: $CAMERA_MODULE_DIR/.venv not ready — run: make install" >&2
     exit 1
 fi
 
 CAMERA_MODULE_DIR="$(cd "$CAMERA_MODULE_DIR" && pwd)"
 CMES_DIR="${CMES_DIR:-$HOME/.cmes}"
+mkdir -p "$HOME/.cache"
 
 DOCKER_ARGS=(
-    --rm -it
+    --rm
     --user "$(id -u):$(id -g)"
     -w "$CAMERA_MODULE_DIR"
     -v "$CAMERA_MODULE_DIR:$CAMERA_MODULE_DIR"
     -v "$CMES_DIR:$CMES_DIR"
+    -v "$HOME/.cache:$HOME/.cache"
     -e "HOME=${HOME}"
+    -e "CAMERA_MODULE_DIR=${CAMERA_MODULE_DIR}"
     -e "VIRTUAL_ENV=${CAMERA_MODULE_DIR}/.venv"
     -e "PATH=${CAMERA_MODULE_DIR}/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 )
+if [[ -f /etc/passwd && -f /etc/group ]]; then
+    DOCKER_ARGS+=(-v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro)
+fi
+if [[ -t 0 && -t 1 ]]; then
+    DOCKER_ARGS+=(-it)
+else
+    DOCKER_ARGS+=(-i)
+fi
 
 [[ -n "$NAME" ]] && DOCKER_ARGS+=(--name "$NAME")
 
