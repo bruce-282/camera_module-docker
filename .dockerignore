@@ -1,0 +1,9 @@
+.git
+.gnupg
+.password-store
+*.asc
+*.key
+.env
+.env.*
+**/credentials*
+**/*token*

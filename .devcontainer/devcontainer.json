@@ -1,0 +1,26 @@
+{
+    "name": "camera_module",
+    "image": "cmes/camera-module:dev",
+    "workspaceFolder": "/build/camera_module",
+    "remoteUser": "bruce",
+    "runArgs": [
+        "--device-cgroup-rule=c 189:* rmw",
+        "--name=camera_module-dev"
+    ],
+    "mounts": [
+        "source=/dev/bus/usb,target=/dev/bus/usb,type=bind"
+    ],
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/build/camera_module/.venv/bin/python"
+            },
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance"
+            ]
+        }
+    },
+    "postAttachCommand": "python -c \"import crp_camera, crp_core; print('OK:', crp_camera.__file__)\"",
+    "overrideCommand": true
+}
