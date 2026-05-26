@@ -3,11 +3,14 @@
 SHELL             := /bin/bash
 
 IMAGE             ?= cmes/camera-module:dev
+CAMERA_MODULE_DIR ?= $(HOME)/camera_module
 CAMERA_EXTRA      ?= zivid
 PASS_CAMERA       ?= gitlab/cmesrobotics/camera_module
 PASS_CRP_CORE     ?= gitlab/cmesrobotics/crp_core
 
-.PHONY: build build-orbbec verify run run-gui shell clean check-pass setup-pass setup-host setup
+export CAMERA_MODULE_DIR
+
+.PHONY: build build-orbbec install install-pull verify run run-gui shell clean check-pass setup-pass setup-host setup
 
 setup-host:
 	@./setup-host.sh
@@ -26,32 +29,40 @@ check-pass:
 
 build: check-pass
 	@docker info >/dev/null 2>&1 || { echo "ERROR: Docker not running (Ubuntu: sudo systemctl start docker)"; exit 1; }
-	@echo ">> building $(IMAGE) (extra=$(CAMERA_EXTRA))"
+	@echo ">> building base image $(IMAGE) (extra=$(CAMERA_EXTRA))"
 	@DOCKER_BUILDKIT=1 docker build \
 		--build-arg CAMERA_EXTRA=$(CAMERA_EXTRA) \
-		--secret id=camera_secret,src=<(pass show $(PASS_CAMERA)) \
-		--secret id=crp_core_secret,src=<(pass show $(PASS_CRP_CORE)) \
 		-t $(IMAGE) .
+
+install: build
+	@CAMERA_EXTRA=$(CAMERA_EXTRA) IMAGE=$(IMAGE) ./install-camera-module.sh
+
+install-pull:
+	@CAMERA_EXTRA=$(CAMERA_EXTRA) IMAGE=$(IMAGE) ./install-camera-module.sh --pull
 
 build-orbbec:
 	$(MAKE) build CAMERA_EXTRA=orbbec-linux
+	$(MAKE) install CAMERA_EXTRA=orbbec-linux
 
 run:
 	IMAGE=$(IMAGE) ./run_container.sh
 
 shell:
-	IMAGE=$(IMAGE) ./run_container.sh --name camera_module-dev bash
+	IMAGE=$(IMAGE) ./run_container.sh --gpu --name camera_module-dev bash
 
 run-gui:
-	IMAGE=$(IMAGE) ./run_container.sh --x11
+	IMAGE=$(IMAGE) ./run_container.sh --gpu --x11
 
 verify:
+	@test -d "$(CAMERA_MODULE_DIR)/.venv" || (echo "run: make install" && exit 1)
 	@! docker history --no-trunc $(IMAGE) | grep -iE 'glpat-|gldt-|_token=' \
 		|| (echo "LEAK in image history" && exit 1)
-	@! docker run --rm --entrypoint /bin/sh $(IMAGE) -c \
-		"grep -RIE 'https://[^/[:space:]]*:[^@[:space:]/]+@gitlab' /build /opt 2>/dev/null" \
-		|| (echo "LEAK in /build or /opt" && exit 1)
+	@! grep -RIE 'https://[^/[:space:]]*:[^@[:space:]/]+@gitlab' "$(CAMERA_MODULE_DIR)/.venv" 2>/dev/null \
+		|| (echo "LEAK in venv" && exit 1)
 	@echo ">> verify OK"
 
 clean:
 	docker rmi $(IMAGE) || true
+
+clean-all: clean
+	rm -rf "$(CAMERA_MODULE_DIR)"

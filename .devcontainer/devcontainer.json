@@ -1,19 +1,27 @@
 {
     "name": "camera_module",
     "image": "cmes/camera-module:dev",
-    "workspaceFolder": "/build/camera_module",
+    "workspaceFolder": "${localEnv:HOME}/camera_module",
     "remoteUser": "bruce",
     "runArgs": [
         "--device-cgroup-rule=c 189:* rmw",
-        "--name=camera_module-dev"
+        "--name=camera_module-dev",
+        "--gpus=all",
+        "-v", "/etc/OpenCL/vendors:/etc/OpenCL/vendors:ro"
     ],
     "mounts": [
+        "source=${localEnv:HOME}/camera_module,target=${localEnv:HOME}/camera_module,type=bind",
+        "source=${localEnv:HOME}/.cmes,target=${localEnv:HOME}/.cmes,type=bind",
         "source=/dev/bus/usb,target=/dev/bus/usb,type=bind"
     ],
+    "containerEnv": {
+        "VIRTUAL_ENV": "${localEnv:HOME}/camera_module/.venv",
+        "PATH": "${localEnv:HOME}/camera_module/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+    },
     "customizations": {
         "vscode": {
             "settings": {
-                "python.defaultInterpreterPath": "/build/camera_module/.venv/bin/python"
+                "python.defaultInterpreterPath": "${localEnv:HOME}/camera_module/.venv/bin/python"
             },
             "extensions": [
                 "ms-python.python",

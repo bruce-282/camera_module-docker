@@ -2,42 +2,53 @@
 
 **Ubuntu 22.04 (네이티브)** 전제. WSL/Docker Desktop은 지원하지 않습니다.
 
-`pass` + `make build` **한 번** → 이미지 안에 `camera_module` + venv.  
-호스트에 repo clone 없음. IDE는 컨테이너 `/build/camera_module`만 열면 됩니다.
+| 무엇 | 위치 |
+|------|------|
+| **camera_module 코드 + `.venv`** | `~/camera_module` (호스트, git clone) |
+| **Docker 이미지** | Zivid SDK / Python / uv 런타임만 (코드 없음) |
+| **설정·로그** | `~/.cmes/` |
+| **이 repo** | `camera_module-docker` (빌드/실행 스크립트) |
+
+IDE·터미널 작업 디렉터리: **`~/camera_module`** (`/build/...` 아님).
 
 ---
 
 ## 한 번에 세팅 (새 PC)
 
-Ubuntu 22.04에서 repo clone 후:
-
 ```bash
 cd camera_module-docker
-
-# GPG 키 파일이 있으면
-./setup-host.sh --gpg-key ~/Downloads/gpg-private.asc
-
-# 또는 대화형 (키 경로 / scp 안내)
-./setup-host.sh
-
-# 또는
-make setup
+./setup-host.sh --gpg-key ~/Downloads/gpg-private.asc   # 또는 ./setup-host.sh
+# = apt + pass + make install  →  ~/camera_module 생성
 ```
 
-하는 일: `apt` (docker, docker-buildx, nvidia-container-toolkit, pass, clinfo) → 옛 `~/.docker/cli-plugins/docker-buildx` 정리 → Docker 그룹 → NVIDIA runtime → pass store clone → `make build`.
-
-옵션: `--skip-build` · `--skip-nvidia` · `--check` · `--help`
-
-GPG 키는 GitLab에 올리지 말고 USB/예전 PC에서 `--gpg-key`로 import.
+옵션: `--skip-build`(install 생략) · `--skip-nvidia` · `--check`
 
 ---
 
-## 빠른 시작 (이 PC에서 이미 GPG 키 import 완료 시)
+## 빠른 시작 (이미 pass + install 완료)
 
 ```bash
 cd camera_module-docker
 ./setup-pass.sh --check
-make build
+make shell          # Zivid: GPU/OpenCL 포함 (내부 --gpu)
+```
+
+처음이거나 venv 없으면:
+
+```bash
+make build          # base Docker 이미지만
+make install        # ~/camera_module clone + uv venv
+```
+
+---
+
+## 디렉터리 구조
+
+```
+~/camera_module/              ← git clone, .venv, 코드 (여기서 작업)
+~/camera_module/.venv/
+~/.cmes/ZividCapture/         ← 프로젝트 config / 로그
+~/Documents/.../camera_module-docker/   ← Docker/Makefile
 ```
 
 ---
@@ -49,7 +60,8 @@ make build
 | GitLab 토큰 (암호화됨) | `password-store.git` | `*.gpg` 파일. 팀이 공유 |
 | GPG **개인키** | 각 PC `~/.gnupg` | 복호화용. **GitLab에 올리지 않음** |
 | GPG 패스프레이즈 | 본인만 | 개인키 파일 유출 시 추가 방어 |
-| `make build` | 이 repo | pass에서 토큰 읽어 Docker secret으로 clone/install |
+| `make build` | 이 repo | Docker **base** 이미지 (Zivid SDK 등) |
+| `make install` | 이 repo | `~/camera_module` clone + `.venv` |
 
 - **웹/GitLab에 매번 토큰 등록할 필요 없음** — store에 이미 있음.
 - **새 개발 PC마다** GPG 개인키 import + store clone **한 번**만 하면 됨.
@@ -209,7 +221,7 @@ cursor .    # 또는 code .
 # → Dev Containers: Reopen in Container
 ```
 
-- workspace: `/build/camera_module` (이미지 안 코드 + `.venv`)
+- workspace: `~/camera_module`
 - devcontainer는 Dockerfile을 직접 빌드하지 않음 (`pass` secret 때문)
 
 ---
@@ -217,7 +229,7 @@ cursor .    # 또는 code .
 ## 실행
 
 ```bash
-make shell          # bash @ /build/camera_module
+make shell          # bash @ ~/camera_module (--gpu)
 make run-gui        # X11 (Ubuntu 데스크톱)
 ./run_container.sh --gpu   # Zivid 등 GPU/OpenCL 필요 시
 ```
@@ -268,10 +280,10 @@ common:
   device_id: FileCameraZivid2PlusMR130.zfc   # data/ 아래 파일명
   enabled_camera_types: [zivid]
 zivid:
-  virtual_camera_path: /build/camera_module/src/crp_camera/cam/zivid/data
+  virtual_camera_path: /home/USER/camera_module/src/crp_camera/cam/zivid/data
 ```
 
-- `.zfc` 파일 위치 (이미지 안): `/build/camera_module/src/crp_camera/cam/zivid/data/`
+- `.zfc` 파일: `~/camera_module/src/crp_camera/cam/zivid/data/`
 - 예시 전체: [`configs/zivid_virtual_camera.config.example.yml`](configs/zivid_virtual_camera.config.example.yml)
 - `use_virtual_camera: false`이면 실제 USB Zivid 또는 SDK 기본 FileCamera(MR60, Windows 경로)로 연결 시도 → Linux에서 실패
 

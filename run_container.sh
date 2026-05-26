@@ -1,27 +1,22 @@
 #!/usr/bin/env bash
 #
-# run_container.sh — launch the camera_module container
+# run_container.sh — launch camera_module container
 #
-# Ubuntu host + Docker CE. Code at /build/camera_module (from make build).
-# Zivid: use --gpu and host OpenCL drivers (see README).
+# Code + venv: ~/camera_module on host (make install), same path inside container.
+# Zivid: use --gpu (see README).
 #
 # Usage:
-#   ./run_container.sh                    # bash in /build/camera_module
-#   ./run_container.sh python3 script.py
-#   ./run_container.sh --smoke-test
+#   ./run_container.sh                    # bash @ ~/camera_module
+#   ./run_container.sh --gpu bash
+#   ./run_container.sh python3 scripts/python_run/capture_zivid_camera.py ...
 #
-# Flags:
-#   --no-usb       disable USB passthrough
-#   --x11          X11 forwarding
-#   --mount-ws DIR mount host dir at /workspace (data only, optional)
-#   --gpu          --gpus all
-#   --smoke-test   run image default CMD
-#   --image IMG    image tag (default: cmes/camera-module:dev)
-#   --name NAME    container name
+# Env:
+#   CAMERA_MODULE_DIR   default: $HOME/camera_module
 
 set -euo pipefail
 
 IMAGE="${IMAGE:-cmes/camera-module:dev}"
+CAMERA_MODULE_DIR="${CAMERA_MODULE_DIR:-$HOME/camera_module}"
 USB="${USB:-1}"
 X11="${X11:-0}"
 MOUNT_WS="${MOUNT_WS:-}"
@@ -39,7 +34,7 @@ while [[ $# -gt 0 ]]; do
         --image)       IMAGE="$2"; shift 2 ;;
         --name)        NAME="$2"; shift 2 ;;
         -h|--help)
-            sed -n '3,22p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '3,16p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         --) shift; break ;;
@@ -61,7 +56,24 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     exit 1
 fi
 
-DOCKER_ARGS=(--rm -it -w /build/camera_module)
+if [[ ! -d "$CAMERA_MODULE_DIR/.venv" ]]; then
+    echo "ERROR: $CAMERA_MODULE_DIR/.venv not found — run: make install" >&2
+    exit 1
+fi
+
+CAMERA_MODULE_DIR="$(cd "$CAMERA_MODULE_DIR" && pwd)"
+CMES_DIR="${CMES_DIR:-$HOME/.cmes}"
+
+DOCKER_ARGS=(
+    --rm -it
+    --user "$(id -u):$(id -g)"
+    -w "$CAMERA_MODULE_DIR"
+    -v "$CAMERA_MODULE_DIR:$CAMERA_MODULE_DIR"
+    -v "$CMES_DIR:$CMES_DIR"
+    -e "HOME=${HOME}"
+    -e "VIRTUAL_ENV=${CAMERA_MODULE_DIR}/.venv"
+    -e "PATH=${CAMERA_MODULE_DIR}/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+)
 
 [[ -n "$NAME" ]] && DOCKER_ARGS+=(--name "$NAME")
 
@@ -81,8 +93,8 @@ if [[ "$X11" == "1" ]]; then
         -v /tmp/.X11-unix:/tmp/.X11-unix:ro
     )
     [[ -n "${XAUTHORITY:-}" && -f "$XAUTHORITY" ]] && DOCKER_ARGS+=(
-        -v "${XAUTHORITY}:/tmp/.Xauthority:ro"
-        -e XAUTHORITY=/tmp/.Xauthority
+        -v "${XAUTHORITY}:${XAUTHORITY}:ro"
+        -e XAUTHORITY="$XAUTHORITY"
     )
 fi
 
@@ -93,7 +105,6 @@ fi
 
 if [[ "$GPU" == "1" ]]; then
     DOCKER_ARGS+=(--gpus all)
-    # NVIDIA injects libnvidia-opencl.so; Zivid also needs ICD loader + vendor file from host.
     if [[ -d /etc/OpenCL/vendors ]]; then
         DOCKER_ARGS+=(-v /etc/OpenCL/vendors:/etc/OpenCL/vendors:ro)
     else
@@ -104,10 +115,11 @@ fi
 if [[ $# -gt 0 ]]; then
     CONTAINER_CMD=("$@")
 elif [[ "$SMOKE_TEST" == "1" ]]; then
-    CONTAINER_CMD=()
+    CONTAINER_CMD=(python3 -c "import crp_camera, crp_core; print('OK')")
 else
     CONTAINER_CMD=(bash)
 fi
 
-echo ">> image: $IMAGE  workspace: /build/camera_module"
+echo ">> image: $IMAGE"
+echo ">> workspace: $CAMERA_MODULE_DIR"
 exec docker run "${DOCKER_ARGS[@]}" "$IMAGE" "${CONTAINER_CMD[@]}"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# setup-host.sh — new Ubuntu dev PC: apt, Docker/buildx, NVIDIA, pass, make build
+# setup-host.sh — apt, Docker, pass, make install (~/camera_module)
 #
 # Usage:
 #   ./setup-host.sh                          full setup (interactive)
@@ -186,14 +186,14 @@ run_setup_pass() {
 
 run_build() {
     if (( SKIP_BUILD == 1 )); then
-        echo ">> skipping make build (--skip-build)"
+        echo ">> skipping make install (--skip-build)"
         return 0
     fi
     if ! docker info >/dev/null 2>&1; then
-        echo "WARN: docker not usable (docker group?) — run: newgrp docker && make build" >&2
+        echo "WARN: docker not usable — run: newgrp docker && make install" >&2
         return 0
     fi
-    make build
+    make install
 }
 
 check_all() {
@@ -202,10 +202,11 @@ check_all() {
     docker buildx ls 2>/dev/null | grep -q running && echo ">> OK: buildx" || { echo "ERROR: buildx" >&2; ok=0; }
     "$SCRIPT_DIR/setup-pass.sh" --check || ok=0
     check_host_opencl
-    if docker image inspect cmes/camera-module:dev >/dev/null 2>&1; then
-        echo ">> OK: image cmes/camera-module:dev"
+    local mod="${CAMERA_MODULE_DIR:-$HOME/camera_module}"
+    if [[ -d "${mod}/.venv" ]]; then
+        echo ">> OK: ${mod}/.venv"
     else
-        echo "WARN: image not built yet — run: make build" >&2
+        echo "WARN: run: make install" >&2
     fi
     (( ok )) || exit 1
     echo ">> check OK"
@@ -225,11 +226,9 @@ main() {
             run_setup_pass
             check_host_opencl
             run_build
-            echo
-            echo ">> Done. Zivid in container: ./run_container.sh --gpu"
-            if ! groups | grep -q '\bdocker\b'; then
-                echo ">> If docker permission denied: newgrp docker   (or re-login)"
-            fi
+            echo ">> Done."
+            echo ">> Code:  ~/camera_module"
+            echo ">> Run:   cd $SCRIPT_DIR && make shell   # Zivid: needs --gpu (make shell includes it)"
             ;;
     esac
 }
