@@ -256,7 +256,28 @@ python3 -c "import ctypes; o=ctypes.CDLL('libOpenCL.so.1'); n=ctypes.c_uint32();
 
 컨테이너 안 `sudo`/`apt` 불필요 — OpenCL은 호스트 드라이버 + `--gpu`로 들어옴.
 
-virtual camera 경로는 Linux 경로 (`/path/to/zfc`, `data/zivid.config.yml` 등).
+### File Camera (가상 Zivid) — Windows 경로 오류
+
+`Failed to load file camera 'C:\ProgramData\Zivid/...'` → **Windows에서 쓰던 기본 경로**를 Linux/컨테이너가 찾는 경우입니다.
+
+프로젝트 config (예: `~/.cmes/ZividCapture/configs/zivid_camera.config.yml`)에서:
+
+```yaml
+common:
+  use_virtual_camera: true
+  device_id: FileCameraZivid2PlusMR130.zfc   # data/ 아래 파일명
+  enabled_camera_types: [zivid]
+zivid:
+  virtual_camera_path: /build/camera_module/src/crp_camera/cam/zivid/data
+```
+
+- `.zfc` 파일 위치 (이미지 안): `/build/camera_module/src/crp_camera/cam/zivid/data/`
+- 예시 전체: [`configs/zivid_virtual_camera.config.example.yml`](configs/zivid_virtual_camera.config.example.yml)
+- `use_virtual_camera: false`이면 실제 USB Zivid 또는 SDK 기본 FileCamera(MR60, Windows 경로)로 연결 시도 → Linux에서 실패
+
+MR60 파일을 쓸 경우: `.zfc`를 위 `data/`에 복사하고 `device_id`만 `FileCameraZivid2PlusMR60.zfc`로 변경.
+
+virtual camera 경로는 Linux 경로 (`/path/to/zfc`, `configs/zivid.config.yml` 등).
 
 ---
 
