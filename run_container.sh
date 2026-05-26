@@ -2,8 +2,8 @@
 #
 # run_container.sh — launch the camera_module container
 #
-# Code lives in the image at /build/camera_module (from make build).
-# No host camera_module clone or mount required.
+# Ubuntu host + Docker CE. Code at /build/camera_module (from make build).
+# Zivid: use --gpu and host OpenCL drivers (see README).
 #
 # Usage:
 #   ./run_container.sh                    # bash in /build/camera_module

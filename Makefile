@@ -17,7 +17,7 @@ check-pass:
 	@echo ">> pass OK"
 
 build: check-pass
-	@docker info >/dev/null 2>&1 || { echo "ERROR: Docker not running"; exit 1; }
+	@docker info >/dev/null 2>&1 || { echo "ERROR: Docker not running (Ubuntu: sudo systemctl start docker)"; exit 1; }
 	@echo ">> building $(IMAGE) (extra=$(CAMERA_EXTRA))"
 	@DOCKER_BUILDKIT=1 docker build \
 		--build-arg CAMERA_EXTRA=$(CAMERA_EXTRA) \

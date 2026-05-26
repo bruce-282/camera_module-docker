@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1.6
+# Target: Ubuntu 22.04 host + Docker CE (not WSL).
 # Build: make build  (pass → BuildKit secret)
 
 ARG CAMERA_REPO=gitlab.cmes-ai.com/crp/module/camera_module.git
