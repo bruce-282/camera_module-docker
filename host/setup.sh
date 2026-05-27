@@ -93,6 +93,12 @@ check_host_opencl() {
     fi
 }
 
+check_optional_opencl() {
+    if [[ "${HOST_INSTALL_ZIVID_SDK:-0}" == "1" ]]; then
+        check_host_opencl
+    fi
+}
+
 check_all() {
     local ok=1
     "$REPO_ROOT/common/setup-pass.sh" --check || ok=0
@@ -106,7 +112,7 @@ check_all() {
     else
         echo "WARN: run: make install-host MODULE=$MODULE" >&2
     fi
-    check_host_opencl
+    check_optional_opencl
     (( ok )) || exit 1
     echo ">> check OK"
 }
@@ -119,13 +125,16 @@ main() {
             install_host_deps
             prompt_gpg_import
             "$REPO_ROOT/common/setup-pass.sh"
-            check_host_opencl
+            check_optional_opencl
             if (( SKIP_INSTALL == 0 )); then
                 MODULE="$MODULE" MODULE_EXTRA="$MODULE_EXTRA" \
                     "$SCRIPT_DIR/install.sh" "$MODULE" --extra "${MODULE_EXTRA:-}" --skip-deps
+                echo ">> Done."
+                print_install_summary host
+            else
+                echo ">> Done. (module install skipped)"
+                echo ">> To install later: make install-host MODULE=$MODULE MODULE_EXTRA=${MODULE_EXTRA:-none}"
             fi
-            echo ">> Done."
-            print_install_summary host
             ;;
     esac
 }

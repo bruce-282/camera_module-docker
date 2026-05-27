@@ -5,6 +5,8 @@ ROOT              := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 MODULE            ?= camera_module
 MODULE_EXTRA      ?= zivid
+SETUP_MODULE_EXTRA ?= none
+SETUP_ARGS        ?=
 # backward-compatible aliases
 CAMERA_EXTRA      ?= $(MODULE_EXTRA)
 IMAGE             ?= cmes/crp-module-install:dev
@@ -18,7 +20,7 @@ export MODULE MODULE_EXTRA CAMERA_EXTRA
         install-cam install-cam-host install-recon install-recon-host \
         install-cal install-cal-host install-recon-docker install-cal-docker \
         capture capture-host verify run run-gui shell clean check-pass \
-        setup-pass setup-host setup-host-native setup list-modules
+        setup-pass setup-host setup-host-native setup-host-native-cam setup list-modules
 
 list-modules:
 	@./host/install.sh --list
@@ -34,7 +36,7 @@ check-pass:
 # ── docker ───────────────────────────────────────────────────────────────────
 
 setup-host:
-	@$(ROOT)docker/setup.sh
+	@$(ROOT)docker/setup.sh $(SETUP_ARGS)
 
 setup: setup-host
 
@@ -76,7 +78,10 @@ capture:
 # ── host (no Docker) ─────────────────────────────────────────────────────────
 
 setup-host-native:
-	@MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) $(ROOT)host/setup.sh
+	@MODULE=$(MODULE) MODULE_EXTRA=$(SETUP_MODULE_EXTRA) $(ROOT)host/setup.sh --skip-install $(SETUP_ARGS)
+
+setup-host-native-cam:
+	@MODULE=camera_module MODULE_EXTRA=zivid $(ROOT)host/setup.sh $(SETUP_ARGS)
 
 install-host: check-pass
 	@MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) \

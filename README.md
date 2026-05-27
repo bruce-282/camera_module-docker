@@ -9,11 +9,19 @@ CRP private 모듈 설치 (pass + host / Docker). **Ubuntu 22.04**
 `gpg-private.asc`는 **USB/예전 PC에서 복사** (GitLab에서 받지 않음).
 
 ```bash
-# Host — apt + pass + install
-make setup-host-native -- --gpg-key ~/gpg-private.asc
+# Host — apt + pass + gpg 준비만 (모듈 설치 없음)
+make setup-host-native SETUP_ARGS="--gpg-key ~/gpg-private.asc"
+
+# Host + camera(Zivid)까지 같이 준비
+make setup-host-native-cam SETUP_ARGS="--gpg-key ~/gpg-private.asc"
 
 # Docker — 위 + docker + Zivid runtime
-make setup-host -- --gpg-key ~/gpg-private.asc
+make setup-host SETUP_ARGS="--gpg-key ~/gpg-private.asc"
+
+# 모듈 설치는 필요할 때 별도 실행
+make install-recon
+make install-cal
+make install-cam MODULE_EXTRA=none
 ```
 
 ---

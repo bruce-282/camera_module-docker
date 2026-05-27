@@ -48,12 +48,21 @@ install_host_apt_packages() {
         python3.10 python3.10-venv python3-dev
         libusb-1.0-0 libusb-1.0-0-dev libudev1
         libgl1 libglib2.0-0
-        ocl-icd-libopencl1 clinfo
         pass gnupg
     )
+    local extra_pkgs=()
+    if [[ "${HOST_INSTALL_ZIVID_SDK:-0}" == "1" ]]; then
+        extra_pkgs+=(ocl-icd-libopencl1 clinfo)
+    fi
     echo ">> apt install: ${pkgs[*]}"
+    if [[ ${#extra_pkgs[@]} -gt 0 ]]; then
+        echo ">> apt install (camera extra): ${extra_pkgs[*]}"
+    fi
     sudo apt-get update -qq
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${pkgs[@]}"
+    if [[ ${#extra_pkgs[@]} -gt 0 ]]; then
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${extra_pkgs[@]}"
+    fi
 }
 
 install_extra_host_deps() {
