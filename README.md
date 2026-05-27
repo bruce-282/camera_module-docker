@@ -14,6 +14,9 @@
 
 모든 설치(`make install`, `make install-host`)는 **pass + GPG**가 먼저 필요합니다.
 
+**GPG 한 줄:** GitLab 토큰은 password-store에 **암호화** 저장됨 → PC에 **GPG 개인키**(`gpg-private.asc`)를 import해야 `pass show`로 토큰을 읽을 수 있음.  
+개인키는 **GitLab/Slack에 올리지 않음** (USB·예전 PC에서 새 PC로만 복사). `pass show` 시 묻는 **패스프레이즈**는 그 키의 비밀번호.
+
 팀 store: `https://gitlab.cmes-ai.com/bruce/password-store.git`
 
 | pass 항목 | 용도 |
