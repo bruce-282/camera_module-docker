@@ -15,8 +15,8 @@ PASS_CRP_CORE     ?= gitlab/cmesrobotics/crp_core
 export MODULE MODULE_EXTRA CAMERA_EXTRA
 
 .PHONY: build build-orbbec install install-pull install-host install-host-pull \
-        install-recon install-recon-host install-cal install-cal-host \
-        install-recon-docker install-cal-docker \
+        install-cam install-cam-host install-recon install-recon-host \
+        install-cal install-cal-host install-recon-docker install-cal-docker \
         capture capture-host verify run run-gui shell clean check-pass \
         setup-pass setup-host setup-host-native setup list-modules
 
@@ -91,6 +91,9 @@ capture-host:
 		$(ROOT)examples/capture/run_host.sh $(MODULE) --extra $(MODULE_EXTRA)
 
 # pip install -e .  (no extras) — default for recon/cal modules
+
+install-cam install-cam-host:
+	$(MAKE) install-host MODULE=camera_module MODULE_EXTRA=$(MODULE_EXTRA)
 
 install-recon install-recon-host:
 	$(MAKE) install-host MODULE=reconstruction_module
