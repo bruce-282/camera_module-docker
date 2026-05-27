@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 #
-# host/setup.sh — pass + apt + Zivid on host (no Docker)
+# host/setup.sh — pass + apt + module install on host (no Docker)
 #
 # Usage:
-#   ./host/setup.sh
-#   ./host/setup.sh --gpg-key ~/gpg-private.asc
+#   ./host/setup.sh [--module camera_module] [--extra zivid]
 #   make setup-host-native
 
 set -euo pipefail
@@ -12,9 +11,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# shellcheck source=../common/module-config.sh
+source "$REPO_ROOT/common/module-config.sh"
 # shellcheck source=deps.sh
 source "$SCRIPT_DIR/deps.sh"
 
+MODULE="${MODULE:-camera_module}"
+MODULE_EXTRA="${MODULE_EXTRA:-${CAMERA_EXTRA:-}}"
 SKIP_INSTALL=0
 GPG_KEY=""
 MODE=setup
@@ -23,6 +26,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --check)        MODE=check; shift ;;
         --skip-install) SKIP_INSTALL=1; shift ;;
+        --module)       MODULE="$2"; shift 2 ;;
+        --module=*)     MODULE="${1#*=}"; shift ;;
+        --extra)        MODULE_EXTRA="$2"; shift 2 ;;
+        --extra=*)      MODULE_EXTRA="${1#*=}"; shift ;;
         --gpg-key)
             shift
             GPG_KEY="${1:?--gpg-key requires path}"
@@ -39,6 +46,11 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+load_module_profile "$MODULE"
+[[ -n "${MODULE_EXTRA:-}" ]] || MODULE_EXTRA="${MODULE_PIP_EXTRA_DEFAULT:-}"
+load_extra_profile "${MODULE_EXTRA:-}"
+apply_legacy_aliases
 
 warn_ubuntu() {
     if [[ -f /etc/os-release ]]; then
@@ -82,17 +94,17 @@ check_host_opencl() {
 }
 
 check_all() {
-    local ok=1 mod="${CAMERA_MODULE_DIR:-$HOME/camera_module}"
+    local ok=1
     "$REPO_ROOT/common/setup-pass.sh" --check || ok=0
     command -v uv >/dev/null 2>&1 && echo ">> OK: uv" || { echo "ERROR: uv" >&2; ok=0; }
-    if [[ "${CAMERA_EXTRA:-zivid}" == "zivid" ]]; then
+    if [[ "${HOST_INSTALL_ZIVID_SDK:-0}" == "1" ]]; then
         dpkg-query -W -f='${Status}' zivid 2>/dev/null | grep -q "install ok installed" \
             && echo ">> OK: zivid SDK" || { echo "ERROR: zivid SDK" >&2; ok=0; }
     fi
-    if [[ -x "${mod}/.venv/bin/python" ]]; then
-        echo ">> OK: ${mod}/.venv"
+    if [[ -x "${MODULE_DIR}/.venv/bin/python" ]]; then
+        echo ">> OK: ${MODULE_DIR}/.venv"
     else
-        echo "WARN: run: make install-host" >&2
+        echo "WARN: run: make install-host MODULE=$MODULE" >&2
     fi
     check_host_opencl
     (( ok )) || exit 1
@@ -109,13 +121,11 @@ main() {
             "$REPO_ROOT/common/setup-pass.sh"
             check_host_opencl
             if (( SKIP_INSTALL == 0 )); then
-                CAMERA_EXTRA="${CAMERA_EXTRA:-zivid}" \
-                    "$SCRIPT_DIR/install.sh" --skip-deps
+                MODULE="$MODULE" MODULE_EXTRA="$MODULE_EXTRA" \
+                    "$SCRIPT_DIR/install.sh" "$MODULE" --extra "${MODULE_EXTRA:-}" --skip-deps
             fi
             echo ">> Done."
-            echo ">> Code:  ~/camera_module"
-            echo ">> Run:   source ~/camera_module/.venv/bin/activate"
-            echo ">> Zivid: ./host/run_zivid_capture.sh"
+            print_install_summary host
             ;;
     esac
 }

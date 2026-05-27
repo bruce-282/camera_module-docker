@@ -12,6 +12,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# shellcheck source=../common/module-config.sh
+source "$REPO_ROOT/common/module-config.sh"
+
+MODULE="${MODULE:-camera_module}"
+MODULE_EXTRA="${MODULE_EXTRA:-${CAMERA_EXTRA:-}}"
 SKIP_BUILD=0
 SKIP_NVIDIA=0
 GPG_KEY=""
@@ -22,6 +27,10 @@ while [[ $# -gt 0 ]]; do
         --check)        MODE=check; shift ;;
         --skip-build)   SKIP_BUILD=1; shift ;;
         --skip-nvidia)  SKIP_NVIDIA=1; shift ;;
+        --module)       MODULE="$2"; shift 2 ;;
+        --module=*)     MODULE="${1#*=}"; shift ;;
+        --extra)        MODULE_EXTRA="$2"; shift 2 ;;
+        --extra=*)      MODULE_EXTRA="${1#*=}"; shift ;;
         --gpg-key)
             shift
             GPG_KEY="${1:?--gpg-key requires path}"
@@ -185,20 +194,24 @@ run_build() {
         echo "WARN: docker not usable — run: newgrp docker && make install" >&2
         return 0
     fi
-    make -C "$REPO_ROOT" install
+    make -C "$REPO_ROOT" install MODULE="$MODULE" MODULE_EXTRA="${MODULE_EXTRA:-}"
 }
 
 check_all() {
+    load_module_profile "$MODULE"
+    [[ -n "${MODULE_EXTRA:-}" ]] || MODULE_EXTRA="${MODULE_PIP_EXTRA_DEFAULT:-}"
+    load_extra_profile "${MODULE_EXTRA:-}"
+    apply_legacy_aliases
     local ok=1
     command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && echo ">> OK: docker" || { echo "ERROR: docker" >&2; ok=0; }
     docker buildx ls 2>/dev/null | grep -q running && echo ">> OK: buildx" || { echo "ERROR: buildx" >&2; ok=0; }
     "$REPO_ROOT/common/setup-pass.sh" --check || ok=0
     check_host_opencl
-    local mod="${CAMERA_MODULE_DIR:-$HOME/camera_module}"
+    local mod="${MODULE_DIR}"
     if [[ -f "${mod}/.venv/pyvenv.cfg" ]]; then
         echo ">> OK: ${mod}/.venv"
     else
-        echo "WARN: run: make install" >&2
+        echo "WARN: run: make install MODULE=$MODULE" >&2
     fi
     (( ok )) || exit 1
     echo ">> check OK"
@@ -209,6 +222,10 @@ main() {
     case "$MODE" in
         check) check_all ;;
         setup)
+            load_module_profile "$MODULE"
+            [[ -n "${MODULE_EXTRA:-}" ]] || MODULE_EXTRA="${MODULE_PIP_EXTRA_DEFAULT:-}"
+            load_extra_profile "${MODULE_EXTRA:-}"
+            apply_legacy_aliases
             install_apt_packages
             fix_buildx_plugin
             ensure_docker_running
@@ -219,8 +236,7 @@ main() {
             check_host_opencl
             run_build
             echo ">> Done."
-            echo ">> Code:  ~/camera_module"
-            echo ">> Run:   make shell"
+            print_install_summary docker
             ;;
     esac
 }

@@ -1,4 +1,4 @@
-# host/deps.sh — apt + Zivid SDK on Ubuntu 22.04 (no Docker)
+# host/deps.sh — apt + extra-specific SDK on Ubuntu 22.04
 
 ZIVID_SDK_RELEASE="${ZIVID_SDK_RELEASE:-2.15.0+5fcc365b-1}"
 
@@ -56,10 +56,14 @@ install_host_apt_packages() {
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${pkgs[@]}"
 }
 
+install_extra_host_deps() {
+    if [[ "${HOST_INSTALL_ZIVID_SDK:-0}" == "1" ]]; then
+        install_zivid_sdk
+    fi
+}
+
 install_host_deps() {
     install_host_apt_packages
     ensure_uv
-    if [[ "${CAMERA_EXTRA:-zivid}" == "zivid" ]]; then
-        install_zivid_sdk
-    fi
+    install_extra_host_deps
 }

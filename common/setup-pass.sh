@@ -17,6 +17,11 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=module-config.sh
+source "$SCRIPT_DIR/module-config.sh"
+
 PASS_CAMERA="${PASS_CAMERA:-gitlab/cmesrobotics/camera_module}"
 PASS_CRP_CORE="${PASS_CRP_CORE:-gitlab/cmesrobotics/crp_core}"
 PASS_STORE_REPO="${PASS_STORE_REPO:-https://gitlab.cmes-ai.com/bruce/password-store.git}"
@@ -264,9 +269,10 @@ entry_file_exists() {
 }
 
 entry_valid() {
-    local entry=$1
-    PASSWORD_STORE="${PASS_STORE_DIR}" pass show "$entry" >/dev/null 2>&1 \
-        && PASSWORD_STORE="${PASS_STORE_DIR}" pass show "$entry" | grep -qE '^login:[[:space:]]'
+    local entry=$1 line
+    PASSWORD_STORE="${PASS_STORE_DIR}" pass show "$entry" >/dev/null 2>&1 || return 1
+    line="$(PASSWORD_STORE="${PASS_STORE_DIR}" pass show "$entry" | sed -n '1p')"
+    [[ -n "${line// }" ]]
 }
 
 entry_decrypt_failed() {
@@ -277,7 +283,7 @@ entry_decrypt_failed() {
 check_entries() {
     local entry ok=1
     export PASSWORD_STORE="${PASS_STORE_DIR}"
-    for entry in "$PASS_CAMERA" "$PASS_CRP_CORE"; do
+    while IFS= read -r entry; do
         if entry_valid "$entry"; then
             echo ">> OK: $entry"
         elif entry_decrypt_failed "$entry"; then
@@ -290,7 +296,7 @@ check_entries() {
             echo "ERROR: pass '$entry' not found in repo" >&2
             ok=0
         fi
-    done
+    done < <(collect_pass_entries)
     if (( ok )); then
         echo ">> pass OK"
         return 0
@@ -333,13 +339,13 @@ setup_entries() {
         require_gpg_for_store
     fi
 
-    for entry in "$PASS_CAMERA" "$PASS_CRP_CORE"; do
+    while IFS= read -r entry; do
         if entry_decrypt_failed "$entry"; then
             require_gpg_for_store
         fi
-    done
+    done < <(collect_pass_entries)
 
-    for entry in "$PASS_CAMERA" "$PASS_CRP_CORE"; do
+    while IFS= read -r entry; do
         if entry_valid "$entry"; then
             echo ">> OK: $entry"
             continue
@@ -353,7 +359,7 @@ setup_entries() {
             exit 1
         fi
         insert_entry_interactive "$entry"
-    done
+    done < <(collect_pass_entries)
     check_entries
 }
 

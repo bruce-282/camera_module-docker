@@ -1,10 +1,10 @@
 # camera_module Docker
 
-**Ubuntu 22.04 (네이티브)** 전제. WSL/Docker Desktop은 지원하지 않습니다.
+**Ubuntu 22.04 (네이티브)** 전제.
 
 | 무엇 | 위치 |
 |------|------|
-| **camera_module 코드 + `.venv`** | `~/camera_module` (호스트, git clone) |
+| **모듈 코드 + `.venv`** | `~/camera_module` 등 (프로필별) |
 | **설정·로그** | `~/.cmes/` |
 | **이 repo** | `camera_module-docker` |
 
@@ -14,47 +14,74 @@
 
 ```
 camera_module-docker/
-├── common/          pass + clone/pip 공통
-│   ├── setup-pass.sh
-│   └── install-common.sh
-├── docker/          Docker 경로 (Zivid SDK in image)
-│   ├── Dockerfile
-│   ├── setup.sh
-│   ├── install.sh
-│   ├── run_container.sh
-│   └── run_zivid_capture.sh
-├── host/            호스트 경로 (Zivid SDK on Ubuntu)
-│   ├── setup.sh
-│   ├── install.sh
-│   ├── deps.sh
-│   └── run_zivid_capture.sh
+├── common/                 pass, clone/pip, capture test
 ├── configs/
+│   ├── modules/            모듈별 프로필 (*.env)
+│   └── extras/             pip extra별 deps/capture (zivid, orbbec-linux, …)
+├── docker/                 Docker 설치·실행
+├── host/                   호스트 설치·실행
 └── Makefile
 ```
 
 ---
 
-## 두 가지 설치 경로
+## CRP modules
 
-### Docker (SDK를 이미지에)
+| Module | Host install | pass (clone) |
+|--------|--------------|--------------|
+| `camera_module` | `make install-host` (+ `MODULE_EXTRA=zivid`) | `gitlab/cmesrobotics/camera_module` |
+| `reconstruction_module` | `make install-recon` | `gitlab/cmesrobotics/reconstruction_module` |
+| `calibration_module` | `make install-cal` | `gitlab/cmesrobotics/calibration_module` |
+
+All modules use `PASS_PIP=gitlab/cmesrobotics/crp_core`. Recon/cal have **no pip extra** (`pip install -e .`).
 
 ```bash
-cd camera_module-docker
-make setup-host -- --gpg-key ~/gpg-private.asc   # 새 PC 1회
-make install                                      # clone + venv
-make shell                                        # 컨테이너 bash (--gpu)
-./docker/run_zivid_capture.sh                     # Zivid 가상 카메라
+make install-recon          # ~/reconstruction_module
+make install-cal            # ~/calibration_module
+make install-host MODULE=reconstruction_module   # same
 ```
 
-### Host (Docker 없이)
+Profiles: `configs/modules/*.env` · extras only for camera: `configs/extras/zivid.env`
+
+---
+
+## 모듈 + EXTRA
+
+**모듈** = clone 대상 (`configs/modules/<name>.env`)  
+**EXTRA** = `pip install -e ".[extra]"` + deps/capture (`configs/extras/<extra>.env`)
 
 ```bash
-cd camera_module-docker
-make setup-host-native -- --gpg-key ~/gpg-private.asc   # 새 PC 1회
-# 또는: make install-host
+# camera_module + Zivid (기본)
+make install-host
 
-source ~/camera_module/.venv/bin/activate
-./host/run_zivid_capture.sh
+# Orbbec extra
+make install-host MODULE=camera_module MODULE_EXTRA=orbbec-linux
+
+# 다른 모듈 (프로필 추가 후)
+make install-host MODULE=your_module MODULE_EXTRA=none
+
+./host/install.sh --list          # 등록된 모듈 목록
+```
+
+새 모듈 추가: `configs/modules/_template.env` 복사 → `configs/modules/your_module.env` 편집.
+
+---
+
+## Docker
+
+```bash
+make setup-host -- --gpg-key ~/gpg-private.asc
+make install MODULE=camera_module MODULE_EXTRA=zivid
+make shell
+make capture MODULE=camera_module MODULE_EXTRA=zivid
+```
+
+## Host (Docker 없이)
+
+```bash
+make setup-host-native -- --gpg-key ~/gpg-private.asc
+make install-host MODULE=camera_module MODULE_EXTRA=zivid
+make capture-host
 ```
 
 ---
@@ -63,39 +90,23 @@ source ~/camera_module/.venv/bin/activate
 
 팀 store: `https://gitlab.cmes-ai.com/bruce/password-store.git`
 
-| 항목 | pass 경로 |
-|------|-----------|
-| camera_module clone | `gitlab/cmesrobotics/camera_module` |
-| crp_core pip | `gitlab/cmesrobotics/crp_core` |
+모듈 프로필의 `PASS_CLONE`, `PASS_PIP` 항목이 필요합니다.  
+`camera_module` 기본값: `gitlab/cmesrobotics/camera_module`, `gitlab/cmesrobotics/crp_core`.
 
 ```bash
-make setup-pass          # common/setup-pass.sh
-make check-pass
-gpg --import ~/gpg-private.asc   # PC마다 1회
+make setup-pass
+gpg --import ~/gpg-private.asc
 ```
 
 ---
 
 ## Make targets
 
-| 명령 | 경로 |
+| 명령 | 설명 |
 |------|------|
-| `make setup-host` | `docker/setup.sh` |
-| `make setup-host-native` | `host/setup.sh` |
-| `make build` / `make install` | Docker |
-| `make install-host` | Host |
-| `make shell` | `docker/run_container.sh --gpu` |
+| `make list-modules` | 모듈 프로필 목록 |
+| `make install` / `install-host` | `MODULE` + `MODULE_EXTRA` |
+| `make capture` / `capture-host` | extra 프로필에 capture 설정 있을 때만 |
+| `make build-orbbec` | `MODULE_EXTRA=orbbec-linux` shortcut |
 
----
-
-## Zivid
-
-- **Docker:** `make shell` 또는 `./docker/run_container.sh --gpu` + nvidia-container-toolkit
-- **Host:** Zivid SDK `.deb`는 `host/deps.sh`가 설치 (`make install-host`)
-- File Camera config 예시: [`configs/zivid_virtual_camera.config.example.yml`](configs/zivid_virtual_camera.config.example.yml)
-
----
-
-## Cursor / Dev Container
-
-`make build` 후 `.devcontainer/devcontainer.json` — workspace `~/camera_module`, 이미지 `cmes/camera-module:dev`.
+환경 변수: `MODULE`, `MODULE_EXTRA` (구 `CAMERA_EXTRA` 호환)

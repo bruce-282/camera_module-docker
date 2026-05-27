@@ -3,16 +3,25 @@
 SHELL             := /bin/bash
 ROOT              := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
+MODULE            ?= camera_module
+MODULE_EXTRA      ?= zivid
+# backward-compatible aliases
+CAMERA_EXTRA      ?= $(MODULE_EXTRA)
 IMAGE             ?= cmes/camera-module:dev
 CAMERA_MODULE_DIR ?= $(HOME)/camera_module
-CAMERA_EXTRA      ?= zivid
 PASS_CAMERA       ?= gitlab/cmesrobotics/camera_module
 PASS_CRP_CORE     ?= gitlab/cmesrobotics/crp_core
 
-export CAMERA_MODULE_DIR
+export MODULE MODULE_EXTRA CAMERA_EXTRA
 
 .PHONY: build build-orbbec install install-pull install-host install-host-pull \
-        verify run run-gui shell clean check-pass setup-pass setup-host setup-host-native setup
+        install-recon install-recon-host install-cal install-cal-host \
+        install-recon-docker install-cal-docker \
+        capture capture-host verify run run-gui shell clean check-pass \
+        setup-pass setup-host setup-host-native setup list-modules
+
+list-modules:
+	@./host/install.sh --list
 
 # ── common ───────────────────────────────────────────────────────────────────
 
@@ -31,41 +40,69 @@ setup: setup-host
 
 build: check-pass
 	@docker info >/dev/null 2>&1 || { echo "ERROR: Docker not running (Ubuntu: sudo systemctl start docker)"; exit 1; }
-	@echo ">> building base image $(IMAGE) (extra=$(CAMERA_EXTRA))"
+	@echo ">> building $(IMAGE) (module=$(MODULE) extra=$(MODULE_EXTRA))"
 	@DOCKER_BUILDKIT=1 docker build \
-		--build-arg CAMERA_EXTRA=$(CAMERA_EXTRA) \
+		--build-arg CAMERA_EXTRA=$(MODULE_EXTRA) \
 		-f $(ROOT)docker/Dockerfile \
 		-t $(IMAGE) $(ROOT)docker
 
 install: build
-	@CAMERA_EXTRA=$(CAMERA_EXTRA) IMAGE=$(IMAGE) $(ROOT)docker/install.sh
+	@MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) IMAGE=$(IMAGE) \
+		$(ROOT)docker/install.sh $(MODULE) --extra $(MODULE_EXTRA)
 
 install-pull:
-	@CAMERA_EXTRA=$(CAMERA_EXTRA) IMAGE=$(IMAGE) $(ROOT)docker/install.sh --pull
+	@MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) IMAGE=$(IMAGE) \
+		$(ROOT)docker/install.sh $(MODULE) --extra $(MODULE_EXTRA) --pull
 
 build-orbbec:
-	$(MAKE) build CAMERA_EXTRA=orbbec-linux
-	$(MAKE) install CAMERA_EXTRA=orbbec-linux
+	$(MAKE) build MODULE=camera_module MODULE_EXTRA=orbbec-linux
+	$(MAKE) install MODULE=camera_module MODULE_EXTRA=orbbec-linux
 
 run:
-	IMAGE=$(IMAGE) $(ROOT)docker/run_container.sh
+	MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) IMAGE=$(IMAGE) \
+		$(ROOT)docker/run_container.sh --module $(MODULE)
 
 shell:
-	IMAGE=$(IMAGE) $(ROOT)docker/run_container.sh --gpu --name camera_module-dev bash
+	MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) IMAGE=$(IMAGE) \
+		$(ROOT)docker/run_container.sh --gpu --module $(MODULE) --name $(MODULE)-dev bash
 
 run-gui:
-	IMAGE=$(IMAGE) $(ROOT)docker/run_container.sh --gpu --x11
+	MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) IMAGE=$(IMAGE) \
+		$(ROOT)docker/run_container.sh --gpu --x11 --module $(MODULE)
+
+capture:
+	MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) $(ROOT)docker/run_capture.sh $(MODULE) --extra $(MODULE_EXTRA)
 
 # ── host (no Docker) ─────────────────────────────────────────────────────────
 
 setup-host-native:
-	@$(ROOT)host/setup.sh
+	@MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) $(ROOT)host/setup.sh
 
 install-host: check-pass
-	@CAMERA_EXTRA=$(CAMERA_EXTRA) $(ROOT)host/install.sh
+	@MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) \
+		$(ROOT)host/install.sh $(MODULE) --extra $(MODULE_EXTRA)
 
 install-host-pull: check-pass
-	@CAMERA_EXTRA=$(CAMERA_EXTRA) $(ROOT)host/install.sh --pull
+	@MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) \
+		$(ROOT)host/install.sh $(MODULE) --extra $(MODULE_EXTRA) --pull
+
+capture-host:
+	@MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) \
+		$(ROOT)host/run_capture.sh $(MODULE) --extra $(MODULE_EXTRA)
+
+# pip install -e .  (no extras) — default for recon/cal modules
+
+install-recon install-recon-host:
+	$(MAKE) install-host MODULE=reconstruction_module
+
+install-cal install-cal-host:
+	$(MAKE) install-host MODULE=calibration_module
+
+install-recon-docker:
+	$(MAKE) install MODULE=reconstruction_module
+
+install-cal-docker:
+	$(MAKE) install MODULE=calibration_module
 
 # ── verify / clean ───────────────────────────────────────────────────────────
 

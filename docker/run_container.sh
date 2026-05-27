@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
 #
-# docker/run_container.sh — launch camera_module container
+# docker/run_container.sh — launch module container
 #
 # Usage:
-#   ./docker/run_container.sh --gpu
+#   ./docker/run_container.sh --gpu [--module camera_module]
 #   make shell
 
 set -euo pipefail
 
-IMAGE="${IMAGE:-cmes/camera-module:dev}"
-CAMERA_MODULE_DIR="${CAMERA_MODULE_DIR:-$HOME/camera_module}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# shellcheck source=../common/module-config.sh
+source "$REPO_ROOT/common/module-config.sh"
+
+MODULE="${MODULE:-camera_module}"
+MODULE_EXTRA="${MODULE_EXTRA:-${CAMERA_EXTRA:-}}"
+IMAGE="${IMAGE:-}"
+MODULE_DIR="${MODULE_DIR:-${CAMERA_MODULE_DIR:-}}"
 USB="${USB:-1}"
 X11="${X11:-0}"
 MOUNT_WS="${MOUNT_WS:-}"
@@ -26,8 +34,12 @@ while [[ $# -gt 0 ]]; do
         --smoke-test)  SMOKE_TEST=1; shift ;;
         --image)       IMAGE="$2"; shift 2 ;;
         --name)        NAME="$2"; shift 2 ;;
+        --module)      MODULE="$2"; shift 2 ;;
+        --module=*)    MODULE="${1#*=}"; shift ;;
+        --extra)       MODULE_EXTRA="$2"; shift 2 ;;
+        --extra=*)     MODULE_EXTRA="${1#*=}"; shift ;;
         -h|--help)
-            sed -n '3,8p' "$0" | sed 's/^# \{0,1\}//'
+            echo "Usage: $(basename "$0") [--gpu] [--module NAME] [cmd...]"
             exit 0
             ;;
         --) shift; break ;;
@@ -39,36 +51,44 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ -z "$MODULE_DIR" || -z "$IMAGE" ]]; then
+    load_module_profile "$MODULE"
+    [[ -n "${MODULE_EXTRA:-}" ]] || MODULE_EXTRA="${MODULE_PIP_EXTRA_DEFAULT:-}"
+    [[ -n "${MODULE_EXTRA:-}" ]] && load_extra_profile "$MODULE_EXTRA"
+    apply_legacy_aliases
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
     echo "ERROR: docker not found" >&2
     exit 1
 fi
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-    echo "ERROR: image '$IMAGE' not found — run: make build" >&2
+    echo "ERROR: image '$IMAGE' not found — run: make build MODULE=$MODULE" >&2
     exit 1
 fi
 
-if [[ ! -f "$CAMERA_MODULE_DIR/.venv/pyvenv.cfg" ]]; then
-    echo "ERROR: $CAMERA_MODULE_DIR/.venv not ready — run: make install" >&2
+if [[ ! -f "$MODULE_DIR/.venv/pyvenv.cfg" ]]; then
+    echo "ERROR: $MODULE_DIR/.venv not ready — run: make install MODULE=$MODULE" >&2
     exit 1
 fi
 
-CAMERA_MODULE_DIR="$(cd "$CAMERA_MODULE_DIR" && pwd)"
+MODULE_DIR="$(cd "$MODULE_DIR" && pwd)"
 CMES_DIR="${CMES_DIR:-$HOME/.cmes}"
 mkdir -p "$HOME/.cache"
 
 DOCKER_ARGS=(
     --rm
     --user "$(id -u):$(id -g)"
-    -w "$CAMERA_MODULE_DIR"
-    -v "$CAMERA_MODULE_DIR:$CAMERA_MODULE_DIR"
+    -w "$MODULE_DIR"
+    -v "$MODULE_DIR:$MODULE_DIR"
     -v "$CMES_DIR:$CMES_DIR"
     -v "$HOME/.cache:$HOME/.cache"
     -e "HOME=${HOME}"
-    -e "CAMERA_MODULE_DIR=${CAMERA_MODULE_DIR}"
-    -e "VIRTUAL_ENV=${CAMERA_MODULE_DIR}/.venv"
-    -e "PATH=${CAMERA_MODULE_DIR}/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+    -e "MODULE_DIR=${MODULE_DIR}"
+    -e "CAMERA_MODULE_DIR=${MODULE_DIR}"
+    -e "VIRTUAL_ENV=${MODULE_DIR}/.venv"
+    -e "PATH=${MODULE_DIR}/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 )
 if [[ -f /etc/passwd && -f /etc/group ]]; then
     DOCKER_ARGS+=(-v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro)
@@ -125,5 +145,5 @@ else
 fi
 
 echo ">> image: $IMAGE"
-echo ">> workspace: $CAMERA_MODULE_DIR"
+echo ">> module: $MODULE  workspace: $MODULE_DIR"
 exec docker run "${DOCKER_ARGS[@]}" "$IMAGE" "${CONTAINER_CMD[@]}"
