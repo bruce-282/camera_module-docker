@@ -9,5 +9,5 @@ common:
 
 zivid:
   # Linux path under ~/camera_module (NOT C:\ProgramData\...)
-  virtual_camera_path: /home/bruce/camera_module/src/crp_camera/cam/zivid/data
-  cam_param_path: /home/bruce/camera_module/configs/zivid.config.yml
+  virtual_camera_path: /home/USER/camera_module/src/crp_camera/cam/zivid/data
+  cam_param_path: /home/USER/camera_module/configs/zivid.config.yml

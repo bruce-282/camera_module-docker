@@ -14,12 +14,14 @@
 
 ```
 camera_module-docker/
-├── common/                 pass, clone/pip, capture test
+├── common/                 pass, clone/pip
 ├── configs/
-│   ├── modules/            모듈별 프로필 (*.env)
-│   └── extras/             pip extra별 deps/capture (zivid, orbbec-linux, …)
+│   └── modules/            모듈별 프로필 (*.env)
+│       └── camera_module/extras/   pip extra (camera_module 전용)
+├── examples/
+│   └── capture/            Zivid capture smoke test (example only)
 ├── docker/                 Docker 설치·실행
-├── host/                   호스트 설치·실행
+├── host/                   호스트 설치
 └── Makefile
 ```
 
@@ -41,14 +43,17 @@ make install-cal            # ~/calibration_module
 make install-host MODULE=reconstruction_module   # same
 ```
 
-Profiles: `configs/modules/*.env` · extras only for camera: `configs/extras/zivid.env`
+Profiles: `configs/modules/*.env`
+
+**pip extra**는 `camera_module`만: `configs/modules/camera_module/extras/{zivid,orbbec-linux,none}.env`  
+recon/cal 등 다른 모듈은 extra 없음 (`pip install -e .`).
 
 ---
 
-## 모듈 + EXTRA
+## 모듈 + EXTRA (camera_module only)
 
 **모듈** = clone 대상 (`configs/modules/<name>.env`)  
-**EXTRA** = `pip install -e ".[extra]"` + deps/capture (`configs/extras/<extra>.env`)
+**EXTRA** = `pip install -e ".[extra]"` — **`camera_module` 전용** (`configs/modules/camera_module/extras/`)
 
 ```bash
 # camera_module + Zivid (기본)
@@ -57,8 +62,9 @@ make install-host
 # Orbbec extra
 make install-host MODULE=camera_module MODULE_EXTRA=orbbec-linux
 
-# 다른 모듈 (프로필 추가 후)
-make install-host MODULE=your_module MODULE_EXTRA=none
+# 다른 모듈 (extra 없음)
+make install-host MODULE=reconstruction_module
+make install-host MODULE=calibration_module
 
 ./host/install.sh --list          # 등록된 모듈 목록
 ```
@@ -73,7 +79,7 @@ make install-host MODULE=your_module MODULE_EXTRA=none
 make setup-host -- --gpg-key ~/gpg-private.asc
 make install MODULE=camera_module MODULE_EXTRA=zivid
 make shell
-make capture MODULE=camera_module MODULE_EXTRA=zivid
+make capture MODULE=camera_module MODULE_EXTRA=zivid   # examples/capture/
 ```
 
 ## Host (Docker 없이)
@@ -106,7 +112,7 @@ gpg --import ~/gpg-private.asc
 |------|------|
 | `make list-modules` | 모듈 프로필 목록 |
 | `make install` / `install-host` | `MODULE` + `MODULE_EXTRA` |
-| `make capture` / `capture-host` | extra 프로필에 capture 설정 있을 때만 |
+| `make capture` / `capture-host` | `examples/capture/` (camera + zivid extra 예시) |
 | `make build-orbbec` | `MODULE_EXTRA=orbbec-linux` shortcut |
 
 환경 변수: `MODULE`, `MODULE_EXTRA` (구 `CAMERA_EXTRA` 호환)

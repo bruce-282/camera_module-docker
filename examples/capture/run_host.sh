@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# host/run_capture.sh — optional capture smoke test (extra profile driven)
+# Example: capture smoke test on host (camera_module + zivid extra)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# shellcheck source=../common/module-config.sh
+# shellcheck source=../../common/module-config.sh
 source "$REPO_ROOT/common/module-config.sh"
-# shellcheck source=../common/capture-test.sh
-source "$REPO_ROOT/common/capture-test.sh"
+# shellcheck source=lib.sh
+source "$SCRIPT_DIR/lib.sh"
 
 MODULE="${MODULE:-camera_module}"
 MODULE_EXTRA="${MODULE_EXTRA:-${CAMERA_EXTRA:-}}"

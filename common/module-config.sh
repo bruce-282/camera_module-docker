@@ -10,6 +10,21 @@ list_modules() {
     done
 }
 
+list_module_extras() {
+    local module=$1
+    local dir="$REPO_ROOT/configs/modules/${module}/extras"
+    local f
+    [[ -d "$dir" ]] || return 0
+    for f in "$dir"/*.env; do
+        [[ -f "$f" ]] || continue
+        basename "$f" .env
+    done
+}
+
+module_has_extras() {
+    [[ -d "$REPO_ROOT/configs/modules/${1}/extras" ]]
+}
+
 load_module_profile() {
     local name=$1
     local profile="$REPO_ROOT/configs/modules/${name}.env"
@@ -30,14 +45,25 @@ load_module_profile() {
 
 load_extra_profile() {
     local extra=$1
-    [[ -n "$extra" ]] || {
+    if [[ -z "$extra" ]]; then
         EXTRA_NAME=""
         CAPTURE_ENABLED="${CAPTURE_ENABLED:-0}"
+        HOST_INSTALL_ZIVID_SDK="${HOST_INSTALL_ZIVID_SDK:-0}"
+        DOCKER_BUILD_ZIVID="${DOCKER_BUILD_ZIVID:-0}"
+        VERIFY_IMPORTS_EXTRA="${VERIFY_IMPORTS_EXTRA:-}"
         return 0
-    }
-    local profile="$REPO_ROOT/configs/extras/${extra}.env"
+    fi
+
+    if ! module_has_extras "$MODULE_NAME"; then
+        echo "ERROR: module '$MODULE_NAME' has no pip extras (no --extra)" >&2
+        exit 1
+    fi
+
+    local profile="$REPO_ROOT/configs/modules/${MODULE_NAME}/extras/${extra}.env"
     [[ -f "$profile" ]] || {
-        echo "ERROR: unknown extra '$extra' (configs/extras/${extra}.env)" >&2
+        echo "ERROR: unknown extra '$extra' for module '$MODULE_NAME'" >&2
+        echo "       expected: configs/modules/${MODULE_NAME}/extras/${extra}.env" >&2
+        echo "Available: $(list_module_extras "$MODULE_NAME" | tr '\n' ' ')" >&2
         exit 1
     }
     # shellcheck disable=SC1090
@@ -124,9 +150,9 @@ print_install_summary() {
     echo ">> Activate:  source $MODULE_DIR/.venv/bin/activate"
     if [[ "${CAPTURE_ENABLED:-0}" == "1" ]]; then
         if [[ "$runtime" == docker ]]; then
-            echo ">> Capture:   MODULE_EXTRA=${MODULE_EXTRA:-} ./docker/run_capture.sh $MODULE_NAME"
+            echo ">> Example:   make capture   # examples/capture/run_docker.sh"
         else
-            echo ">> Capture:   MODULE_EXTRA=${MODULE_EXTRA:-} ./host/run_capture.sh $MODULE_NAME"
+            echo ">> Example:   make capture-host   # examples/capture/run_host.sh"
         fi
     elif [[ -n "${MODULE_RUN_HINT:-}" ]]; then
         echo ">> Run:       $MODULE_RUN_HINT"

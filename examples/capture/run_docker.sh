@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# docker/run_capture.sh — capture smoke test via container (+ GPU if extra requires)
+# Example: capture smoke test via Docker (+ GPU when extra requires)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# shellcheck source=../common/module-config.sh
+# shellcheck source=../../common/module-config.sh
 source "$REPO_ROOT/common/module-config.sh"
+# shellcheck source=lib.sh
+source "$SCRIPT_DIR/lib.sh"
 
 MODULE="${MODULE:-camera_module}"
 MODULE_EXTRA="${MODULE_EXTRA:-${CAMERA_EXTRA:-}}"
@@ -32,7 +34,7 @@ load_extra_profile "${MODULE_EXTRA:-}"
 apply_legacy_aliases
 
 if [[ "${CAPTURE_ENABLED:-0}" != "1" ]]; then
-    echo ">> No capture test for extra '${MODULE_EXTRA:-none}'" >&2
+    echo ">> No capture example for extra '${MODULE_EXTRA:-none}'" >&2
     exit 0
 fi
 
@@ -41,9 +43,9 @@ if [[ "${CAPTURE_GPU:-0}" == "1" ]]; then
     GPU_ARGS=(--gpu)
 fi
 
-CAPTURE_SCRIPT="${CAPTURE_SCRIPT:-$REPO_ROOT/common/capture/zivid_virtual.py}"
+CAPTURE_SCRIPT="${CAPTURE_SCRIPT:-$(default_capture_script)}"
 
-exec "${SCRIPT_DIR}/run_container.sh" "${GPU_ARGS[@]}" --module "$MODULE" bash -c "
+exec "${REPO_ROOT}/docker/run_container.sh" "${GPU_ARGS[@]}" --module "$MODULE" bash -c "
 set -eu
 cd '${MODULE_DIR}/${CAPTURE_WORKDIR}'
 export MODULE_DIR='${MODULE_DIR}'

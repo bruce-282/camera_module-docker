@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Zivid File Camera smoke test — paths from env (see configs/extras/zivid.env)."""
+"""Example: Zivid File Camera smoke test (see configs/modules/camera_module/extras/zivid.env)."""
 from __future__ import annotations
 
 import os

@@ -71,7 +71,7 @@ run-gui:
 		$(ROOT)docker/run_container.sh --gpu --x11 --module $(MODULE)
 
 capture:
-	MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) $(ROOT)docker/run_capture.sh $(MODULE) --extra $(MODULE_EXTRA)
+	MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) $(ROOT)examples/capture/run_docker.sh $(MODULE) --extra $(MODULE_EXTRA)
 
 # ── host (no Docker) ─────────────────────────────────────────────────────────
 
@@ -88,7 +88,7 @@ install-host-pull: check-pass
 
 capture-host:
 	@MODULE=$(MODULE) MODULE_EXTRA=$(MODULE_EXTRA) \
-		$(ROOT)host/run_capture.sh $(MODULE) --extra $(MODULE_EXTRA)
+		$(ROOT)examples/capture/run_host.sh $(MODULE) --extra $(MODULE_EXTRA)
 
 # pip install -e .  (no extras) — default for recon/cal modules
 
