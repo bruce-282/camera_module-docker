@@ -10,98 +10,109 @@
 
 ---
 
-## repo 구조
+## 1. pass (공통 — 먼저)
 
+모든 설치(`make install`, `make install-host`)는 **pass + GPG**가 먼저 필요합니다.
+
+팀 store: `https://gitlab.cmes-ai.com/bruce/password-store.git`
+
+| pass 항목 | 용도 |
+|-----------|------|
+| `gitlab/cmesrobotics/camera_module` | camera_module clone |
+| `gitlab/cmesrobotics/reconstruction_module` | reconstruction_module clone |
+| `gitlab/cmesrobotics/calibration_module` | calibration_module clone |
+| `gitlab/cmesrobotics/crp_core` | pip install (모든 모듈 공통) |
+
+```bash
+# 새 PC — GPG 키 import (1회)
+gpg --import ~/gpg-private.asc
+
+# password-store clone + 항목 확인
+make setup-pass
+make check-pass
 ```
-camera_module-docker/
-├── common/                 pass, clone/pip
-├── configs/
-│   └── modules/            모듈별 프로필 (*.env)
-│       └── camera_module/extras/   pip extra (camera_module 전용)
-├── examples/
-│   └── capture/            Zivid capture smoke test (example only)
-├── docker/                 Docker 설치·실행
-├── host/                   호스트 설치
-└── Makefile
+
+`make setup-pass` / `make check-pass` 실패 시 → GPG 키·store부터 해결한 뒤 아래로 진행.
+
+---
+
+## 2. 설치 (pass OK 이후)
+
+### Host (Docker 없이)
+
+```bash
+make setup-host-native -- --gpg-key ~/gpg-private.asc   # 새 PC: apt + pass + install
+# 또는 pass 이미 OK면:
+make install-host MODULE=camera_module MODULE_EXTRA=zivid
+make install-recon
+make install-cal
 ```
+
+### Docker
+
+```bash
+make setup-host -- --gpg-key ~/gpg-private.asc   # 새 PC: apt + docker + pass + install
+# 또는 pass 이미 OK면:
+make install MODULE=camera_module MODULE_EXTRA=zivid
+make shell
+```
+
+### camera_module + pip extra (Zivid / Orbbec)
+
+`EXTRA`는 **camera_module만**: `configs/modules/camera_module/extras/`
+
+```bash
+make install-host                                    # extra=zivid (기본)
+make install-host MODULE=camera_module MODULE_EXTRA=orbbec-linux
+make install-host MODULE=camera_module MODULE_EXTRA=none
+```
+
+recon / cal은 extra 없음 → `pip install -e .` 만.
+
+```bash
+make install-recon
+make install-cal
+./host/install.sh --list
+```
+
+---
+
+## 3. 예시 (선택)
+
+Zivid File Camera smoke test — **설치 필수 아님**, `examples/capture/` 참고.
+
+```bash
+make capture-host MODULE=camera_module MODULE_EXTRA=zivid
+make capture
+```
+
+config 예시: `examples/capture/zivid_camera.config.example.yml`
 
 ---
 
 ## CRP modules
 
-| Module | Host install | pass (clone) |
-|--------|--------------|--------------|
-| `camera_module` | `make install-host` (+ `MODULE_EXTRA=zivid`) | `gitlab/cmesrobotics/camera_module` |
+| Module | 설치 | clone pass |
+|--------|------|------------|
+| `camera_module` | `make install-host` (+ extra) | `gitlab/cmesrobotics/camera_module` |
 | `reconstruction_module` | `make install-recon` | `gitlab/cmesrobotics/reconstruction_module` |
 | `calibration_module` | `make install-cal` | `gitlab/cmesrobotics/calibration_module` |
 
-All modules use `PASS_PIP=gitlab/cmesrobotics/crp_core`. Recon/cal have **no pip extra** (`pip install -e .`).
-
-```bash
-make install-recon          # ~/reconstruction_module
-make install-cal            # ~/calibration_module
-make install-host MODULE=reconstruction_module   # same
-```
-
-Profiles: `configs/modules/*.env`
-
-**pip extra**는 `camera_module`만: `configs/modules/camera_module/extras/{zivid,orbbec-linux,none}.env`  
-recon/cal 등 다른 모듈은 extra 없음 (`pip install -e .`).
+새 모듈: `configs/modules/_template.env` 복사 → 편집.
 
 ---
 
-## 모듈 + EXTRA (camera_module only)
+## repo 구조
 
-**모듈** = clone 대상 (`configs/modules/<name>.env`)  
-**EXTRA** = `pip install -e ".[extra]"` — **`camera_module` 전용** (`configs/modules/camera_module/extras/`)
-
-```bash
-# camera_module + Zivid (기본)
-make install-host
-
-# Orbbec extra
-make install-host MODULE=camera_module MODULE_EXTRA=orbbec-linux
-
-# 다른 모듈 (extra 없음)
-make install-host MODULE=reconstruction_module
-make install-host MODULE=calibration_module
-
-./host/install.sh --list          # 등록된 모듈 목록
 ```
-
-새 모듈 추가: `configs/modules/_template.env` 복사 → `configs/modules/your_module.env` 편집.
-
----
-
-## Docker
-
-```bash
-make setup-host -- --gpg-key ~/gpg-private.asc
-make install MODULE=camera_module MODULE_EXTRA=zivid
-make shell
-make capture MODULE=camera_module MODULE_EXTRA=zivid   # examples/capture/
-```
-
-## Host (Docker 없이)
-
-```bash
-make setup-host-native -- --gpg-key ~/gpg-private.asc
-make install-host MODULE=camera_module MODULE_EXTRA=zivid
-make capture-host
-```
-
----
-
-## pass (공통)
-
-팀 store: `https://gitlab.cmes-ai.com/bruce/password-store.git`
-
-모듈 프로필의 `PASS_CLONE`, `PASS_PIP` 항목이 필요합니다.  
-`camera_module` 기본값: `gitlab/cmesrobotics/camera_module`, `gitlab/cmesrobotics/crp_core`.
-
-```bash
-make setup-pass
-gpg --import ~/gpg-private.asc
+camera_module-docker/
+├── common/                 pass, clone/pip
+├── configs/modules/        모듈 프로필 (*.env)
+│   └── camera_module/extras/   pip extra (camera_module 전용)
+├── examples/capture/       Zivid smoke test (example)
+├── docker/                 Docker 설치·실행
+├── host/                   호스트 설치
+└── Makefile
 ```
 
 ---
@@ -110,9 +121,12 @@ gpg --import ~/gpg-private.asc
 
 | 명령 | 설명 |
 |------|------|
-| `make list-modules` | 모듈 프로필 목록 |
-| `make install` / `install-host` | `MODULE` + `MODULE_EXTRA` |
-| `make capture` / `capture-host` | `examples/capture/` (camera + zivid extra 예시) |
-| `make build-orbbec` | `MODULE_EXTRA=orbbec-linux` shortcut |
+| `make setup-pass` / `check-pass` | **1단계** — pass store |
+| `make setup-host-native` | Host 새 PC (pass + apt + install) |
+| `make setup-host` | Docker 새 PC (pass + docker + install) |
+| `make install-host` / `install` | 모듈 설치 (`MODULE`, `MODULE_EXTRA`) |
+| `make install-recon` / `install-cal` | shortcut |
+| `make capture-host` / `capture` | examples (camera + zivid) |
+| `make list-modules` | 등록된 모듈 목록 |
 
 환경 변수: `MODULE`, `MODULE_EXTRA` (구 `CAMERA_EXTRA` 호환)
