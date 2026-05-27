@@ -31,8 +31,8 @@
 gpg --import ~/gpg-private.asc
 
 # password-store clone + 항목 확인
-make setup-pass
-make check-pass
+make setup-pass # ~/.password-store 를 GitLab에서 clone/pull
+make check-pass # 열리는지 확인
 ```
 
 `make setup-pass` / `make check-pass` 실패 시 → GPG 키·store부터 해결한 뒤 아래로 진행.
