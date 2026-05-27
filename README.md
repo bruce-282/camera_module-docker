@@ -1,6 +1,6 @@
-# camera_module Docker
+# crp-module-install
 
-**Ubuntu 22.04** · 모듈 코드는 `~/camera_module` 등 · 설정/로그는 `~/.cmes/`
+CRP private 모듈 설치 (pass + host / Docker). **Ubuntu 22.04**
 
 ---
 

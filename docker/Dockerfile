@@ -1,6 +1,5 @@
 # syntax=docker/dockerfile:1.6
-# Runtime base for camera_module — code/venv live on host at ~/camera_module (make install).
-# Target: Ubuntu 22.04 host + Docker CE (not WSL).
+# Runtime base image for CRP modules (code/venv on host). Ubuntu 22.04 + Docker CE.
 
 ARG CAMERA_EXTRA=zivid
 ARG ZIVID_SDK_RELEASE=2.15.0+5fcc365b-1
@@ -36,4 +35,4 @@ RUN set -eu; \
     fi
 
 WORKDIR /tmp
-CMD ["python3", "-c", "print('camera_module base image OK — run: make install')"]
+CMD ["python3", "-c", "print('crp-module-install base image OK — run: make install')"]

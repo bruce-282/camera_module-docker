@@ -1,6 +1,6 @@
 {
-    "name": "camera_module",
-    "image": "cmes/camera-module:dev",
+    "name": "crp-module-install (camera_module)",
+    "image": "cmes/crp-module-install:dev",
     "workspaceFolder": "${localEnv:HOME}/camera_module",
     "remoteUser": "bruce",
     "runArgs": [

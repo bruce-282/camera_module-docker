@@ -1,4 +1,4 @@
-# camera_module — pass tokens + Docker or host install
+# crp-module-install — pass + host/Docker module install
 
 SHELL             := /bin/bash
 ROOT              := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -7,7 +7,7 @@ MODULE            ?= camera_module
 MODULE_EXTRA      ?= zivid
 # backward-compatible aliases
 CAMERA_EXTRA      ?= $(MODULE_EXTRA)
-IMAGE             ?= cmes/camera-module:dev
+IMAGE             ?= cmes/crp-module-install:dev
 CAMERA_MODULE_DIR ?= $(HOME)/camera_module
 PASS_CAMERA       ?= gitlab/cmesrobotics/camera_module
 PASS_CRP_CORE     ?= gitlab/cmesrobotics/crp_core
@@ -110,7 +110,7 @@ install-cal-docker:
 # ── verify / clean ───────────────────────────────────────────────────────────
 
 verify:
-	@test -d "$(CAMERA_MODULE_DIR)/.venv" || (echo "run: make install or make install-host" && exit 1)
+	@test -d "$(CAMERA_MODULE_DIR)/.venv" || (echo "run: make install-cam or make install-recon" && exit 1)
 	@! docker history --no-trunc $(IMAGE) 2>/dev/null | grep -iE 'glpat-|gldt-|_token=' \
 		|| (echo "LEAK in image history" && exit 1)
 	@! grep -RIE 'https://[^/[:space:]]*:[^@[:space:]/]+@gitlab' "$(CAMERA_MODULE_DIR)/.venv" 2>/dev/null \
